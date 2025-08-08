@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 import org.gradle.kotlin.dsl.implementation
 
 plugins {
@@ -73,20 +75,20 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.okhttp)
 
-    implementation("com.google.accompanist:accompanist-pager:0.36.0")
-    implementation("com.google.accompanist:accompanist-pager-indicators:0.36.0")
+    implementation(libs.accompanist.pager)
+    implementation(libs.accompanist.pager.indicators)
     implementation(libs.play.services.location)
     implementation(libs.androidx.core.ktx)// Location & permissions
-    implementation("com.google.android.gms:play-services-location:21.3.0")
-    implementation("com.google.accompanist:accompanist-permissions:0.37.3")
+    implementation(libs.play.services.location.v2130)
+    implementation(libs.accompanist.permissions.v0373)
 
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.compose.ui:ui:1.8.3")
-    implementation("androidx.compose.material:material:1.8.3")
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.ui)
+    implementation(libs.androidx.material)
 
-    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
-    implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0")
-    implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
+    implementation (libs.androidx.lifecycle.viewmodel.compose)
+    implementation (libs.androidx.lifecycle.runtime.ktx.v280)
+    implementation(libs.reorderable)
 
 
 }
