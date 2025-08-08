@@ -3,7 +3,6 @@ package com.example.myapplication
 import androidx.compose.runtime.*
 import com.example.myapplication.utils.CompactBottomBar
 import com.example.myapplication.utils.CustomBottomBar
-import com.example.myapplication.MusicPlayerViewModel
 
 @Composable
 fun PlayerUI(

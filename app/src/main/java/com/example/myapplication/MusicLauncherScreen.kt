@@ -42,7 +42,7 @@ fun MusicLauncherScreen(
 
     // upcoming listesi mutableStateList olmadığı için LaunchedEffect ile takip etmek zor
     // İsterseniz bunu ViewModel'den direkt collect edebilirsiniz.
-    val upcoming by remember { mutableStateOf(musicPlayerVM.upcomingSongs) }
+    val upcomingSongs by musicPlayerVM.upcomingSongs.collectAsState()
 
     val selectedAudio by musicPlayerVM.selectedAudio.collectAsState()
     val isPlaying by musicPlayerVM.isPlaying.collectAsState()
@@ -174,17 +174,21 @@ fun MusicLauncherScreen(
                         onSeekTo = { musicPlayerVM.seekTo(it) },
                         onNext = { musicPlayerVM.playNext() },
                         onPrevious = { musicPlayerVM.playPrevious() },
+                        onShuffleNextSongs = { musicPlayerVM.shuffleUpcomingSongs() },
                         modifier = Modifier
                     )
-
+                    val upcomingSongs by musicPlayerVM.upcomingSongs.collectAsState()
                     // Sonraki Şarkılar Popup
                     NextSongsPopup(
-                        upcoming = musicPlayerVM.upcomingSongs,
+                        upcoming = upcomingSongs,  // collectAsState ile alınan listeyi veriyoruz
                         currentPlaying = currentPlaying,
-                        onListChanged = { newList -> musicPlayerVM.updateUpcomingList(newList) },
+                        onListChanged = { newList ->
+                            musicPlayerVM.updateUpcomingList(newList)
+                        },
                         musicPlayerVM = musicPlayerVM,
-                        itemHeightFraction = 0.08f,
-                        fontSizeFraction = 0.0350f
+                        itemHeightFraction = 0.1f,
+                        fontSizeFraction = 0.035f,
+                        selectedAudio = selectedAudio!!
                     )
                 }
             }

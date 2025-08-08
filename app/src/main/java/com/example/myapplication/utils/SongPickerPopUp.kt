@@ -1,7 +1,6 @@
 package com.example.myapplication.utils
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -19,13 +18,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.Icon
 import androidx.compose.material.TabRowDefaults.Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,14 +42,10 @@ import com.example.myapplication.MusicPlayerViewModel.AudioFile
 import com.example.myapplication.getAlbumArt
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.lazy.itemsIndexed
-
-import org.burnoutcrew.reorderable.*
-
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.layout.onSizeChanged
@@ -60,9 +53,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.TextUnit
 import com.example.myapplication.MusicPlayerViewModel
 import kotlin.math.roundToInt
 
@@ -147,20 +138,20 @@ fun SongPickerPopup(
                                     Spacer(modifier = Modifier.height((8 * scaleFactor).dp))
                                     AlbumArtImage(
                                         bitmap = bitmap,
-                                        modifier = Modifier.size((36 * scaleFactor).dp)
+                                        modifier = Modifier.size((48 * scaleFactor).dp)
                                     )
                                     Spacer(modifier = Modifier.width((8 * scaleFactor).dp))
                                     Column {
                                         Text(
                                             text = audio.title,
                                             color = Color.White,
-                                            fontSize = (11 * scaleFactor).sp,
+                                            fontSize = (16 * scaleFactor).sp,
                                             maxLines = 1
                                         )
                                         Text(
                                             text = audio.artist ?: "Bilinmeyen Sanatçı",
                                             color = Color.LightGray,
-                                            fontSize = (8 * scaleFactor).sp,
+                                            fontSize = (11 * scaleFactor).sp,
                                             maxLines = 1
                                         )
                                     }
@@ -192,6 +183,7 @@ fun ExpandedSongInfoPopup(
     onSeekTo: (Long) -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    onShuffleNextSongs: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -263,7 +255,8 @@ fun ExpandedSongInfoPopup(
                     onNext = onNext,
                     onPrevious = onPrevious,
                     onSeekTo = onSeekTo,
-                    onOpenSongPicker = onOpenSongPicker
+                    onOpenSongPicker = onOpenSongPicker,
+                    onShuffleNextSongs = onShuffleNextSongs
                 )
             }
         }
@@ -284,10 +277,15 @@ fun NextSongsPopup(
     musicPlayerVM: MusicPlayerViewModel,
     modifier: Modifier = Modifier,
     itemHeightFraction: Float = 0.05f,   // Toplam yüksekliğin %5’i gibi
-    fontSizeFraction: Float = 0.03f      // Toplam yüksekliğin %3’ü gibi (örnek)
+    fontSizeFraction: Float = 0.03f,
+    selectedAudio: AudioFile   // Toplam yüksekliğin %3’ü gibi (örnek)
 ) {
-    val list = remember { mutableStateListOf<AudioFile>() }
-    val swipeOffsetX = remember { mutableStateListOf<Float>() }
+    val context = LocalContext.current
+
+    // Burada remember parametre olarak upcoming verildi, böylece liste güncellenince state de yenilenir
+    val list = remember(upcoming) { mutableStateListOf<AudioFile>().apply { addAll(upcoming) } }
+
+    val swipeOffsetX = remember { mutableStateListOf<Float>().apply { repeat(list.size) { add(0f) } } }
     var draggingIndex by remember { mutableStateOf(-1) }
     var dragOffsetY by remember { mutableStateOf(0f) }
     var gestureDirection by remember { mutableStateOf<Direction?>(null) }
@@ -298,13 +296,15 @@ fun NextSongsPopup(
 
     var parentHeightPx by remember { mutableStateOf(0) }
 
-    LaunchedEffect(upcoming) {
-        list.clear()
-        list.addAll(upcoming)
-        swipeOffsetX.clear()
-        swipeOffsetX.addAll(List(list.size) { 0f })
+    // Eğer liste büyüklüğü değişirse swipeOffsetX da güncellensin
+    LaunchedEffect(list.size) {
+        if (swipeOffsetX.size != list.size) {
+            swipeOffsetX.clear()
+            swipeOffsetX.addAll(List(list.size) { 0f })
+        }
     }
 
+    // currentPlaying değiştiğinde, listede varsa o elemana scroll yap
     LaunchedEffect(currentPlaying, list) {
         val index = list.indexOfFirst { it.uri == currentPlaying?.uri }
         if (index != -1) {
@@ -363,6 +363,7 @@ fun NextSongsPopup(
         val fontSizePx = parentHeightPx * fontSizeFraction
         val fontSizeSp = with(density) { fontSizePx.toSp() }
 
+        val itemHeightDp = with(density) { itemHeightPx.toDp() }
         Column(
             Modifier
                 .background(Color(0xFF303030))
@@ -387,7 +388,7 @@ fun NextSongsPopup(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(with(density) { itemHeightPx.toDp() })
+                            .height(itemHeightDp)
                             .offset { IntOffset(swipeOffsetX.getOrNull(index)?.roundToInt() ?: 0, offsetY) }
                             .background(if (isDragging) Color.DarkGray else Color.Transparent)
                             .pointerInput(index) {
@@ -467,6 +468,15 @@ fun NextSongsPopup(
                                 .padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val bitmap = remember(audio.uri) {
+                                getAlbumArt(context, audio.uri)
+                            }
+                            AlbumArtImage(
+                                bitmap = bitmap,
+                                modifier = Modifier.size(itemHeightDp * 0.9f)
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = audio.title,
                                 color = if (audio.uri == currentPlaying?.uri) Color.Cyan else Color.LightGray,
@@ -482,9 +492,9 @@ fun NextSongsPopup(
                                 modifier = Modifier.size(fontSizePx.dp)
                             )
                         }
+
                     }
 
-                    // 🔹 Son elemana gelmediysek araya Divider ekle
                     if (index < list.lastIndex) {
                         Divider(
                             color = Color.Gray.copy(alpha = 0.3f),

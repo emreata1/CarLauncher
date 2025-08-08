@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
@@ -227,8 +228,10 @@ fun CompactBottomBar(
     currentPosition: Long = 0L,
     totalDuration: Long = 100L,
     onSeekTo: (Long) -> Unit = {},
-    onOpenSongPicker: () -> Unit = {}
-) {var albumArtWidth by remember { mutableStateOf(0) }
+    onOpenSongPicker: () -> Unit = {},
+    onShuffleNextSongs: () -> Unit = {}   // Yeni parametre
+) {
+    var albumArtWidth by remember { mutableStateOf(0) }
     Column(
         modifier = modifier
             .background(Color(0xFF303030))
@@ -338,10 +341,26 @@ fun CompactBottomBar(
             )
         ) {
             val iconSize = with(density2) { (rowWidth * 0.12f).toDp() }
-
-            IconButton(onClick = onPrevious, modifier = Modifier.size(iconSize)) {
-                Icon(Icons.Default.SkipPrevious, contentDescription = "Önceki", tint = Color.White, modifier = Modifier.size(iconSize))
+            IconButton(onClick = onShuffleNextSongs, modifier = Modifier.size(iconSize)) {
+                Icon(
+                    imageVector = Icons.Default.Shuffle,
+                    contentDescription = "Karıştır",
+                    tint = Color.White,
+                    modifier = Modifier.size(iconSize-10.dp)
+                )
             }
+            IconButton(onClick = onPrevious, modifier = Modifier.size(iconSize)) {
+                Icon(
+                    Icons.Default.SkipPrevious,
+                    contentDescription = "Önceki",
+                    tint = Color.White,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
+
+            // Yeni Shuffle Butonu
+
+
             IconButton(onClick = onPlayPauseToggle, modifier = Modifier.size(iconSize)) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -351,12 +370,25 @@ fun CompactBottomBar(
                 )
             }
             IconButton(onClick = onNext, modifier = Modifier.size(iconSize)) {
-                Icon(Icons.Default.SkipNext, contentDescription = "Sonraki", tint = Color.White, modifier = Modifier.size(iconSize))
+                Icon(
+                    Icons.Default.SkipNext,
+                    contentDescription = "Sonraki",
+                    tint = Color.White,
+                    modifier = Modifier.size(iconSize)
+                )
+            }
+            IconButton(onClick = onShuffleNextSongs, modifier = Modifier.size(iconSize)) {
+                Icon(
+                    imageVector = Icons.Default.Shuffle,
+                    contentDescription = "Karıştır",
+                    tint = Color.White,
+                    modifier = Modifier.size(iconSize-10.dp)
+                )
             }
         }
     }
-
 }
+
 
 
 

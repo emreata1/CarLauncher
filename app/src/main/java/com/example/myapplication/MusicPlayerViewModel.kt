@@ -45,15 +45,14 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    private val _upcomingSongs = mutableStateListOf<AudioFile>()
-    val upcomingSongs: List<AudioFile> get() = _upcomingSongs
+    private val _upcomingSongs = MutableStateFlow<List<AudioFile>>(emptyList())
+    val upcomingSongs: StateFlow<List<AudioFile>> = _upcomingSongs
 
     fun setAudioFiles(files: List<AudioFile>) {
         _audioFiles.clear()
         _audioFiles.addAll(files)
 
-        _upcomingSongs.clear()
-        _upcomingSongs.addAll(files)
+        _upcomingSongs.value = files
 
         if (_audioFiles.isNotEmpty()) {
             currentIndex = 0
@@ -129,37 +128,41 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun playNext() {
         val currentAudio = _selectedAudio.value ?: return
-        val upcomingIndex = _upcomingSongs.indexOfFirst { it.uri == currentAudio.uri }
-
-        if (upcomingIndex != -1 && upcomingIndex < _upcomingSongs.lastIndex) {
-            val nextAudio = _upcomingSongs[upcomingIndex + 1]
-            setAudio(nextAudio, forcePlay = true)
+        val upcomingList = _upcomingSongs.value
+        val upcomingIndex = upcomingList.indexOfFirst { it.uri == currentAudio.uri }
+        if (upcomingIndex != -1) {
+            val nextIndex = (upcomingIndex + 1) % upcomingList.size
+            setAudio(upcomingList[nextIndex], forcePlay = true)
         }
     }
 
     fun playPrevious() {
         val currentAudio = _selectedAudio.value ?: return
-        val upcomingIndex = _upcomingSongs.indexOfFirst { it.uri == currentAudio.uri }
+        val upcomingList = _upcomingSongs.value
+        val upcomingIndex = upcomingList.indexOfFirst { it.uri == currentAudio.uri }
 
         if (upcomingIndex > 0) {
-            val previousAudio = _upcomingSongs[upcomingIndex - 1]
+            val previousAudio = upcomingList[upcomingIndex - 1]
             setAudio(previousAudio, forcePlay = true)
         } else {
             stopAudio()
         }
     }
 
-    fun removeUpcomingAudioAt(index: Int) {
-        if (index !in _upcomingSongs.indices) return
 
-        val removedItem = _upcomingSongs[index]
+    fun removeUpcomingAudioAt(index: Int) {
+        val upcomingList = _upcomingSongs.value.toMutableList()
+        if (index !in upcomingList.indices) return
+
+        val removedItem = upcomingList[index]
         val isRemovedCurrentlyPlaying = removedItem.uri == _selectedAudio.value?.uri
 
-        _upcomingSongs.removeAt(index)
+        upcomingList.removeAt(index)
+        _upcomingSongs.value = upcomingList
 
         if (isRemovedCurrentlyPlaying) {
-            val newIndex = index.coerceAtMost(_upcomingSongs.lastIndex)
-            val nextAudio = _upcomingSongs.getOrNull(newIndex) ?: _upcomingSongs.getOrNull(newIndex - 1)
+            val newIndex = index.coerceAtMost(upcomingList.lastIndex)
+            val nextAudio = upcomingList.getOrNull(newIndex) ?: upcomingList.getOrNull(newIndex - 1)
 
             if (nextAudio != null) {
                 setAudio(nextAudio, forcePlay = true)
@@ -169,26 +172,29 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+
     fun seekTo(position: Long) {
         mediaPlayer?.seekTo(position.toInt())
         _currentPosition.value = position
     }
 
     fun moveUpcoming(fromIndex: Int, toIndex: Int) {
-        if (fromIndex in _upcomingSongs.indices && toIndex in _upcomingSongs.indices) {
-            val item = _upcomingSongs.removeAt(fromIndex)
+        val upcomingList = _upcomingSongs.value.toMutableList()
+        if (fromIndex in upcomingList.indices && toIndex in upcomingList.indices) {
+            val item = upcomingList.removeAt(fromIndex)
             val insertIndex = if (toIndex > fromIndex) toIndex - 1 else toIndex
-            _upcomingSongs.add(insertIndex, item)
+            upcomingList.add(insertIndex, item)
+            _upcomingSongs.value = upcomingList
         }
     }
+
 
     fun selectAudio(audio: AudioFile) {
         setAudio(audio, forcePlay = true)
     }
 
     fun updateUpcomingList(newList: List<AudioFile>) {
-        _upcomingSongs.clear()
-        _upcomingSongs.addAll(newList)
+        _upcomingSongs.value = newList
     }
 
     private fun releasePlayer() {
@@ -262,4 +268,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             return audioList
         }
     }
+    fun shuffleUpcomingSongs() {
+        _upcomingSongs.value = _upcomingSongs.value.shuffled()
+    }
+
 }

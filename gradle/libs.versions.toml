@@ -1,5 +1,7 @@
 [versions]
+accompanistPager = "0.36.0"
 accompanistPermissions = "0.31.5-beta"
+accompanistPermissionsVersion = "0.37.3"
 activityKtx = "1.10.1"
 agp = "8.11.1"
 appcompat = "1.7.1"
@@ -14,20 +16,32 @@ kotlinxCoroutinesPlayServices = "1.7.3"
 lifecycleRuntimeKtx = "2.9.1"
 activityCompose = "1.10.1"
 composeBom = "2025.06.01"
+lifecycleRuntimeKtxVersion = "2.8.0"
+lifecycleViewmodelCompose = "2.8.0"
 material = "1.12.0"
 
 material3 = "1.3.2"   # <-- buraya dikkat
 materialIconsExtended = "1.4.3"
+materialVersion = "1.8.3"
 okhttp = "4.12.0"
 playServicesLocation = "21.0.1"
 media = "1.7.0"
+playServicesLocationVersion = "21.3.0"
+reorderable = "0.9.6"
+ui = "1.8.3"
 
 [libraries]
+accompanist-pager = { module = "com.google.accompanist:accompanist-pager", version.ref = "accompanistPager" }
+accompanist-pager-indicators = { module = "com.google.accompanist:accompanist-pager-indicators", version.ref = "accompanistPager" }
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
+accompanist-permissions-v0373 = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissionsVersion" }
 androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activityKtx" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx-v280 = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtxVersion" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
+androidx-material = { module = "androidx.compose.material:material", version.ref = "materialVersion" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 androidx-material3-icons-core = { module = "androidx.compose.material3:material3-icons-core", version.ref = "material3" }
@@ -50,6 +64,9 @@ material = { module = "com.google.android.material:material", version.ref = "mat
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
+play-services-location-v2130 = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocationVersion" }
+reorderable = { module = "org.burnoutcrew.composereorderable:reorderable", version.ref = "reorderable" }
+ui = { module = "androidx.compose.ui:ui", version.ref = "ui" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

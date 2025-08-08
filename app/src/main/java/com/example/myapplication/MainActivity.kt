@@ -25,8 +25,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
-
 import android.view.WindowInsets
 
 class MainActivity : ComponentActivity() {
