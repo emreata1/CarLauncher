@@ -20,21 +20,22 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.math.*
 
-
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 
 @SuppressLint("MissingPermission")
-
-
 @Composable
-fun SpeedometerScreen() {
+fun SpeedometerScreen(
+    widthFraction: Float = 0.3f,
+    modifier: Modifier = Modifier
+) {
     val vm: SpeedViewModel = viewModel()
     val speed by vm.speedKmh.collectAsState(initial = 0f)
 
     StyledSpeedometer(
         currentSpeed = speed.toInt(),
-        heightFraction = 0.6f
+        widthFraction = widthFraction,
+        modifier = modifier
     )
 }
 
@@ -44,15 +45,14 @@ fun StyledSpeedometer(
     modifier: Modifier = Modifier,
     maxSpeed: Int = 240,
     currentSpeed: Int = 0,
-    heightFraction: Float = 0.3f
+    widthFraction: Float = 0.3f
 ) {
-    // Ekran boyutuna göre speedometer boyutu
+    // Ekran genişliğine göre boyut hesaplama
     val configuration = LocalConfiguration.current
-    val screenHeightDp = configuration.screenHeightDp
-    val sizeDp = (screenHeightDp * heightFraction).dp
+    val screenWidthDp = configuration.screenWidthDp
+    val sizeDp = (screenWidthDp * widthFraction).dp
     val radiusPx = with(LocalDensity.current) { sizeDp.toPx() / 2f }
 
-    // "Selam" animasyonu için açılı değer
     val pointerAnimAngle = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(1000)
@@ -65,13 +65,11 @@ fun StyledSpeedometer(
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
-            // Arkaplan
-            drawRect(Color(0xFF222222))
+
 
             val cx = size.width / 2f
             val cy = size.height / 2f
 
-            // Daire gölgesi
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(Color(0xFF444444), Color(0xFF222222)),
@@ -82,7 +80,6 @@ fun StyledSpeedometer(
                 center = center
             )
 
-            // Çizgiler ve sayılar
             val tickCount = 120
             val startAngle = 135f
             val sweepAngle = 270f
@@ -118,9 +115,8 @@ fun StyledSpeedometer(
                 drawLine(color, Offset(x1, y1), Offset(x2, y2), stroke)
 
                 if (isBigTick) {
-                    // android.graphics.Paint kullanıyoruz, color Int bekler
                     val paint = android.graphics.Paint().apply {
-                        this.color = Color(0xFFAAAAAA).toArgb() // this.color → android.graphics.Paint.color
+                        this.color = Color(0xFFAAAAAA).toArgb()
                         textAlign = android.graphics.Paint.Align.CENTER
                         textSize = radiusPx / 8
                         isAntiAlias = true
@@ -131,7 +127,6 @@ fun StyledSpeedometer(
                     val labelX = cx + labelRadius * cos(angleRad).toFloat()
                     val labelY = cy + labelRadius * sin(angleRad).toFloat()
 
-                    // nativeCanvas.drawText zaten Paint ile doğru çalışır
                     drawContext.canvas.nativeCanvas.drawText(
                         speedValue.toString(),
                         labelX,
@@ -139,10 +134,8 @@ fun StyledSpeedometer(
                         paint
                     )
                 }
-
             }
 
-            // İbre açısı ve çizimi
             val safeSpeed = currentSpeed.coerceIn(0, maxSpeed)
             val basePointerAngle = startAngle + (safeSpeed.toFloat() / maxSpeed) * sweepAngle
             val pointerAngleDeg = basePointerAngle + pointerAnimAngle.value
@@ -150,7 +143,6 @@ fun StyledSpeedometer(
             val pointerLength = radiusPx * 0.75f
             val pointerWidth = radiusPx * 0.03f
 
-            // Pointer üçgeni
             val perp = pointerAngleRad + PI / 2
             val x1 = cx + cos(perp).toFloat() * pointerWidth
             val y1 = cy + sin(perp).toFloat() * pointerWidth
@@ -167,7 +159,6 @@ fun StyledSpeedometer(
             }
             drawPath(path, Color.Red)
 
-            // Merkez halkası
             drawCircle(
                 color = Color.Black,
                 center = Offset(cx, cy),
@@ -182,5 +173,3 @@ fun StyledSpeedometer(
         }
     }
 }
-
-

@@ -1,5 +1,6 @@
 package com.example.myapplication.utils
 
+import android.annotation.SuppressLint
 import android.media.AudioManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -7,13 +8,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+//noinspection UsingMaterialAndMaterial3Libraries
 import androidx.compose.material.Icon
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -21,14 +22,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -59,7 +59,6 @@ fun CustomBottomBar(
     val context = LocalContext.current
     val audioManager = remember { context.getSystemService(AudioManager::class.java) }
     fun volumeUp() = audioManager?.adjustVolume(AudioManager.ADJUST_RAISE, AudioManager.FLAG_PLAY_SOUND)
-    fun volumeDown() = audioManager?.adjustVolume(AudioManager.ADJUST_LOWER, AudioManager.FLAG_PLAY_SOUND)
 
     Row(
         modifier = modifier
@@ -162,7 +161,7 @@ fun CustomBottomBar(
                     )
                 ) {
                     Icon(
-                        imageVector = Icons.Default.QueueMusic,
+                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = "Şarkı Seç",
                         tint = Color.White                   // ikonu beyaz yap
                     )
@@ -231,7 +230,7 @@ fun CompactBottomBar(
     onOpenSongPicker: () -> Unit = {},
     onShuffleNextSongs: () -> Unit = {}   // Yeni parametre
 ) {
-    var albumArtWidth by remember { mutableStateOf(0) }
+
     Column(
         modifier = modifier
             .background(Color(0xFF303030))
@@ -240,7 +239,7 @@ fun CompactBottomBar(
     ) {
 
         // 1) Parça bilgisi
-        var columnWidth by remember { mutableStateOf(0) }
+        var columnWidth by remember { mutableIntStateOf(0) }
 
         Column(
             modifier = Modifier
@@ -278,7 +277,7 @@ fun CompactBottomBar(
         Spacer(modifier = Modifier.height(spacer1Height))
 
         // 2) Slider ve süreler
-        var columnWidth1 by remember { mutableStateOf(0) }
+        var columnWidth1 by remember { mutableIntStateOf(0) }
         val density1 = LocalDensity.current
 
         Column(
@@ -327,7 +326,7 @@ fun CompactBottomBar(
         Spacer(modifier = Modifier.height(spacer3Height))
 
         // 3) Butonlar
-        var rowWidth by remember { mutableStateOf(0) }
+        var rowWidth by remember { mutableIntStateOf(0) }
         val density2 = LocalDensity.current
 
         Row(
@@ -463,6 +462,7 @@ fun CustomCanvasSlider(
 }
 
 
+@SuppressLint("DefaultLocale")
 fun formatTime(millis: Long): String {
     val totalSeconds = millis / 1000
     val minutes = totalSeconds / 60

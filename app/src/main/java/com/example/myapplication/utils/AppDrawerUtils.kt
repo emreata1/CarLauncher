@@ -20,11 +20,7 @@ fun getAllLaunchableApps(context: Context): List<ResolveInfo> {
     ).sortedBy { it.loadLabel(pm).toString() }
 }
 
-fun launchApp(context: Context, app: ResolveInfo) {
-    val launchIntent = context.packageManager
-        .getLaunchIntentForPackage(app.activityInfo.packageName)
-    launchIntent?.let { context.startActivity(it) }
-}
+
 
 fun drawableToBitmap(drawable: Drawable): Bitmap {
     if (drawable is BitmapDrawable) {
