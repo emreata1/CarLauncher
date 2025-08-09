@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.media)
+    implementation(libs.firebase.crashlytics.buildtools)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -90,6 +91,6 @@ dependencies {
     implementation (libs.androidx.lifecycle.runtime.ktx.v280)
     implementation(libs.reorderable)
 
-
+    implementation(libs.gson)
 }
 

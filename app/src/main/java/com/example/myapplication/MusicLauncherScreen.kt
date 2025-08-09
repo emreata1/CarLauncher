@@ -135,33 +135,32 @@ fun MusicLauncherScreen(
                 ) {
                     // Şarkı Seçici Popup
                     SongPickerPopup(
+                        playlists = musicPlayerVM.playlists,
                         audioFiles = audioFiles,
-                        onSelect = { selectedAudio ->
-                            val newUpcoming = audioFiles.let {
-                                val index = it.indexOfFirst { audio -> audio.uri == selectedAudio.uri }
-                                if (index == -1) it else it.drop(index)
-                            }
-                            // Seçilen şarkıyı oynat
-                            musicPlayerVM.setAudio(selectedAudio, forcePlay = true)
-
-                            // Sıradaki şarkılar listesini güncelle
-                            onUpdateUpcomingList(newUpcoming)  // Bu fonksiyon dışarıdan sağlanmalı
+                        audioList = audioList,
+                        onAddPlaylist = { name -> musicPlayerVM.addPlaylist(name) },
+                        onSelectAudio = { audio, fullList ->
+                            musicPlayerVM.selectAudioAndPlayFromHere(audio, fullList)
                         },
-
-                                onDismiss = { showSongPicker = false },
-                        onRefresh = {
-                            audioList = getAllAudioFiles(context)
-                        },
+                        onDismiss = { showSongPicker = false },
+                        onChangePlaylistImage = { playlist, uri -> musicPlayerVM.changePlaylistImage(playlist, uri) },
+                        onAddToQueue = { audio -> musicPlayerVM.addToQueue(audio) },
+                        onAddToPlaylist = { audio, playlist -> musicPlayerVM.addSongToPlaylist(playlist.name, audio) },
+                        onRenameSong = { audio, newName -> musicPlayerVM.renameSongFile(audio, newName) },
+                        onDeleteSong = { audio -> musicPlayerVM.deleteSongFromDevice(audio) },
+                        onToggleFavorite = { audio -> musicPlayerVM.toggleFavorite(audio) },
+                        onPlayPlaylist = { playlist -> musicPlayerVM.playPlaylist(playlist) },
+                        onDeletePlaylist = { playlist -> musicPlayerVM.deletePlaylist(playlist) },
+                        onRenamePlaylist = { playlist, newName -> musicPlayerVM.renamePlaylist(playlist, newName) },
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
                     )
+
 
                     // Detaylı Şarkı Bilgisi Popup
                     ExpandedSongInfoPopup(
                         selectedAudio = selectedAudio!!,
                         onDismiss = { showSongPicker = false },
-                        onOpenSongPicker = { /* ... */ },
+                        onOpenSongPicker = { /* opsiyonel işlem */ },
                         isPlaying = isPlaying,
                         currentPosition = currentPosition,
                         totalDuration = totalDuration,
@@ -172,10 +171,12 @@ fun MusicLauncherScreen(
                         onShuffleNextSongs = { musicPlayerVM.shuffleUpcomingSongs(selectedAudio) },
                         modifier = Modifier
                     )
+
                     val upcomingSongs by musicPlayerVM.upcomingSongs.collectAsState()
+
                     // Sonraki Şarkılar Popup
                     NextSongsPopup(
-                        upcoming = upcomingSongs,  // collectAsState ile alınan listeyi veriyoruz
+                        upcoming = upcomingSongs,
                         currentPlaying = currentPlaying,
                         onListChanged = { newList ->
                             musicPlayerVM.updateUpcomingList(newList)
@@ -188,6 +189,7 @@ fun MusicLauncherScreen(
                 }
             }
         }
+
 
         if (drawerOpen) {
             CustomDrawer(

@@ -10,7 +10,10 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.AndroidViewModel
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -97,6 +100,21 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             _selectedAudio.value = null
             _isPlaying.value = false
         }
+    }
+    fun playPlaylist(playlist: Playlist) {
+        if (playlist.songs.isNotEmpty()) {
+            _upcomingSongs.value = playlist.songs
+            setAudio(playlist.songs[0], forcePlay = true)
+        }
+    }
+    fun selectAudioAndPlayFromHere(selectedAudio: AudioFile, fullList: List<AudioFile>) {
+        val startIndex = fullList.indexOfFirst { it.uri == selectedAudio.uri }
+        if (startIndex == -1) return
+
+        val newQueue = fullList.drop(startIndex) + fullList.take(startIndex)
+
+        updateUpcomingList(newQueue) // Oynatma kuyruğunu sadece o listenin şarkıları yap
+        setAudio(selectedAudio, forcePlay = true)
     }
 
     fun playPause() {
@@ -185,10 +203,103 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     data class AudioFile(
         val title: String,
         val artist: String?,
-        val uri: Uri,
+        val uriString: String,  // Uri yerine string olarak tut
         val album: String? = null,
-        val duration: Long? = null // milisaniye cinsinden süre
-    )
+        val duration: Long? = null
+    ) {
+        val uri: Uri
+            get() = Uri.parse(uriString)
+    }
+
+
+    data class Playlist(
+        val name: String,
+        val songs: List<AudioFile>,
+        val imageUriString: String? = null
+    ) {
+        val imageUri: Uri?
+            get() = imageUriString?.let { Uri.parse(it) }
+    }
+
+
+
+    private val _playlists = mutableStateListOf<Playlist>()
+    val playlists: SnapshotStateList<Playlist> get() = _playlists
+
+    private val playlistStorage = PlaylistStorage(context)
+
+    init {
+        // SharedPreferences'tan oynatma listelerini yükle
+        val savedPlaylists = playlistStorage.loadPlaylists()
+        if (savedPlaylists.isEmpty()) {
+            _playlists.add(Playlist("Favoriler", emptyList()))
+        } else {
+            _playlists.addAll(savedPlaylists)
+        }
+    }
+    fun toggleFavorite(audioFile: AudioFile) {
+        val favIndex = _playlists.indexOfFirst { it.name == "Favoriler" }
+        if (favIndex == -1) {
+            addPlaylist("Favoriler", listOf(audioFile))
+        } else {
+            val favPlaylist = _playlists[favIndex]
+            val isFav = favPlaylist.songs.any { it.uriString == audioFile.uriString }
+            val newSongs = if (isFav) {
+                favPlaylist.songs.filter { it.uriString != audioFile.uriString }
+            } else {
+                favPlaylist.songs + audioFile
+            }
+            _playlists[favIndex] = favPlaylist.copy(songs = newSongs)
+            playlistStorage.savePlaylists(_playlists)
+        }
+    }
+    fun addPlaylist(name: String, songs: List<AudioFile> = emptyList()) {
+        if (_playlists.none { it.name == name }) {
+            _playlists.add(Playlist(name, songs))
+            playlistStorage.savePlaylists(_playlists)
+        }
+    }
+
+    fun changePlaylistImage(playlist: Playlist, imageUri: Uri) {
+        val index = _playlists.indexOfFirst { it.name == playlist.name }
+        if (index != -1) {
+            val updatedPlaylist = playlist.copy(imageUriString = imageUri.toString())
+            _playlists[index] = updatedPlaylist
+            playlistStorage.savePlaylists(_playlists)
+        }
+    }
+
+
+    // Eğer şarkı ekleme/çıkarma gibi işlemler eklersen, orada da playlistStorage.savePlaylists(_playlists) çağırmalısın.
+
+    fun shuffleUpcomingSongs(currentPlaying: AudioFile?) {
+        currentPlaying ?: return
+
+        val current = currentPlaying
+        val rest = _upcomingSongs.value.filter { it.uri != current.uri }.shuffled()
+        _upcomingSongs.value = listOf(current) + rest
+    }
+
+    class PlaylistStorage(private val context: Context) {
+        private val prefs = context.getSharedPreferences("music_prefs", Context.MODE_PRIVATE)
+        private val gson = Gson()
+
+        fun savePlaylists(playlists: List<Playlist>) {
+            // Kaydederken Uri'yi String'e çeviriyoruz
+            val playlistsForSave = playlists.map {
+                it.copy(imageUriString = it.imageUri?.toString())
+            }
+            val json = gson.toJson(playlistsForSave)
+            prefs.edit().putString("playlists", json).apply()
+        }
+
+        fun loadPlaylists(): List<Playlist> {
+            val json = prefs.getString("playlists", null) ?: return emptyList()
+            val type = object : TypeToken<List<Playlist>>() {}.type
+            return gson.fromJson(json, type)
+        }
+    }
+
 
     companion object {
         fun getAllAudioFiles(context: Context): List<AudioFile> {
@@ -225,18 +336,109 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
 
-                    audioList.add(AudioFile(title, artist, contentUri, album, duration))
+                    audioList.add(AudioFile(title, artist, contentUri.toString(), album, duration))
                 }
             }
             return audioList
         }
     }
-    fun shuffleUpcomingSongs(currentPlaying: AudioFile?) {
-        currentPlaying ?: return
 
-        val current = currentPlaying
-        val rest = _upcomingSongs.value.filter { it.uri != current.uri }.shuffled()
-        _upcomingSongs.value = listOf(current) + rest
+
+    fun addSongToPlaylist(playlistName: String, song: AudioFile) {
+        val index = _playlists.indexOfFirst { it.name == playlistName }
+        if (index != -1) {
+            val playlist = _playlists[index]
+            val newSongs = playlist.songs.toMutableList()
+            if (!newSongs.any { it.uri == song.uri }) {
+                newSongs.add(song)
+                _playlists[index] = playlist.copy(songs = newSongs)
+                playlistStorage.savePlaylists(_playlists)
+            }
+        }
     }
 
+    // Playlist'ten şarkı silme
+    fun removeSongFromPlaylist(playlistName: String, song: AudioFile) {
+        val index = _playlists.indexOfFirst { it.name == playlistName }
+        if (index != -1) {
+            val playlist = _playlists[index]
+            val newSongs = playlist.songs.filter { it.uri != song.uri }
+            _playlists[index] = playlist.copy(songs = newSongs)
+            playlistStorage.savePlaylists(_playlists)
+        }
+    }
+
+    // Oynatma kuyruğuna şarkı ekleme
+    fun addToQueue(song: AudioFile) {
+        val currentQueue = _upcomingSongs.value.toMutableList()
+        if (!currentQueue.any { it.uri == song.uri }) {
+            currentQueue.add(song)
+            updateUpcomingList(currentQueue)
+        }
+    }
+
+    fun deleteSongFromDevice(audioFile: AudioFile): Boolean {
+        return try {
+            val rowsDeleted = context.contentResolver.delete(audioFile.uri, null, null)
+            if (rowsDeleted > 0) {
+                removeSongFromAllPlaylists(audioFile)
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun removeSongFromAllPlaylists(song: AudioFile) {
+        val updatedPlaylists = _playlists.map { playlist ->
+            val filteredSongs = playlist.songs.filter { it.uri != song.uri }
+            playlist.copy(songs = filteredSongs)
+        }
+        _playlists.clear()
+        _playlists.addAll(updatedPlaylists)
+        playlistStorage.savePlaylists(_playlists)
+    }
+
+    fun renameSongFile(audioFile: AudioFile, newTitle: String): Boolean {
+        return try {
+            val values = android.content.ContentValues().apply {
+                put(MediaStore.Audio.Media.TITLE, newTitle)
+                put(MediaStore.Audio.Media.DISPLAY_NAME, "$newTitle.mp3")
+            }
+            val rowsUpdated = context.contentResolver.update(audioFile.uri, values, null, null)
+            if (rowsUpdated > 0) {
+                renameSongInAllPlaylists(audioFile, newTitle)
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun renameSongInAllPlaylists(oldSong: AudioFile, newTitle: String) {
+        val updatedPlaylists = _playlists.map { playlist ->
+            val newSongs = playlist.songs.map {
+                if (it.uri == oldSong.uri) it.copy(title = newTitle) else it
+            }
+            playlist.copy(songs = newSongs)
+        }
+        _playlists.clear()
+        _playlists.addAll(updatedPlaylists)
+        playlistStorage.savePlaylists(_playlists)
+    }
+
+    fun deletePlaylist(playlist: Playlist) {
+        _playlists.remove(playlist)
+        playlistStorage.savePlaylists(_playlists)
+    }
+
+    fun renamePlaylist(playlist: Playlist, newName: String) {
+        val index = _playlists.indexOfFirst { it.name == playlist.name }
+        if (index != -1) {
+            _playlists[index] = playlist.copy(name = newName)
+            playlistStorage.savePlaylists(_playlists)
+        }
+    }
 }

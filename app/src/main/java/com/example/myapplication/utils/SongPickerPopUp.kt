@@ -1,5 +1,9 @@
 package com.example.myapplication.utils
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -45,42 +49,91 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.TextButton
+import androidx.compose.material.TextField
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.MusicPlayerViewModel
 import kotlin.math.roundToInt
 
 
+
 @Composable
 fun SongPickerPopup(
-    audioFiles: List<AudioFile>,
-    onSelect: (AudioFile) -> Unit,
+    audioFiles: List<MusicPlayerViewModel.AudioFile>,
+    audioList: List<MusicPlayerViewModel.AudioFile>, // Tüm listeyi parametre olarak alıyoruz
+    playlists: SnapshotStateList<MusicPlayerViewModel.Playlist>,
+    onAddPlaylist: (String) -> Unit,
+    onSelectAudio: (MusicPlayerViewModel.AudioFile, List<MusicPlayerViewModel.AudioFile>) -> Unit,
+
     onDismiss: () -> Unit,
-    onRefresh: () -> Unit,
+    onChangePlaylistImage: (MusicPlayerViewModel.Playlist, Uri) -> Unit,
+    onAddToQueue: (MusicPlayerViewModel.AudioFile) -> Unit,
+    onAddToPlaylist: (MusicPlayerViewModel.AudioFile, MusicPlayerViewModel.Playlist) -> Unit,
+    onRenameSong: (MusicPlayerViewModel.AudioFile, String) -> Unit,
+    onDeleteSong: (MusicPlayerViewModel.AudioFile) -> Unit,
+    onToggleFavorite: (MusicPlayerViewModel.AudioFile) -> Unit,
+    onPlayPlaylist: (MusicPlayerViewModel.Playlist) -> Unit,
+    onDeletePlaylist: (MusicPlayerViewModel.Playlist) -> Unit,
+    onRenamePlaylist: (MusicPlayerViewModel.Playlist, String) -> Unit,
+
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp
     val screenHeightDp = configuration.screenHeightDp
-
-    // Yükseklik ve genişlik üzerinden ölçek faktörü
-    val baseHeightDp = 800f // referans cihaz yüksekliği
-    val scaleFactor = (screenHeightDp / baseHeightDp)*1.5
-
-    var searchQuery by remember { mutableStateOf("") }
+    val baseHeightDp = 800f
+    val scaleFactor = (screenHeightDp / baseHeightDp) * 1.5f
     val context = LocalContext.current
 
-    val filteredList = remember(searchQuery, audioFiles) {
-        if (searchQuery.isBlank()) audioFiles
-        else audioFiles.filter { it.title.contains(searchQuery, ignoreCase = true) }
+    val allPlaylist = remember(audioFiles) { MusicPlayerViewModel.Playlist("Tüm Şarkılar", audioFiles) }
+
+    val playlistList by remember {
+        derivedStateOf { listOf(allPlaylist) + playlists }
     }
+    var showRenameDialogForPlaylist by remember { mutableStateOf(false) }
+    var playlistToRename by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
+    var selectedPlaylist by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var newPlaylistName by remember { mutableStateOf("") }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            selectedPlaylist?.let { playlist ->
+                onChangePlaylistImage(playlist, uri)
+            }
+        }
+    }
+
+    // Bu state tüm playlist satırları için geçerli olacak şekilde dışarıda tutulmalı
+    var menuExpandedForPlaylist by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
 
     Box(
         Modifier
@@ -88,79 +141,230 @@ fun SongPickerPopup(
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
-            ) { onDismiss() }
+            ) {
+                onDismiss()
+            }
     ) {
         Card(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth(0.375f)
                 .fillMaxHeight()
                 .align(Alignment.CenterStart)
                 .padding(bottom = 56.dp),
-
-                    shape = RoundedCornerShape((16 * scaleFactor).dp),
+            shape = RoundedCornerShape((16 * scaleFactor).dp),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(
                 Modifier
                     .background(Color(0xFF303030))
                     .padding(12.dp)
-                    .clickable(enabled = false) {}
+                    .fillMaxSize()
             ) {
-                if (filteredList.isEmpty()) {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Şarkı bulunamadı",
-                            color = Color.LightGray,
-                            fontSize = (14 * scaleFactor).sp
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(filteredList) { audio ->
-                            val bitmap = remember(audio.uri) {
-                                getAlbumArt(context, audio.uri)
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSelect(audio) }
-                                    .padding(
-                                        horizontal = (4 * scaleFactor).dp,
-                                        vertical = (4 * scaleFactor).dp
-                                    )
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Spacer(modifier = Modifier.height((8 * scaleFactor).dp))
-                                    AlbumArtImage(
-                                        bitmap = bitmap,
-                                        modifier = Modifier.size((48 * scaleFactor).dp)
-                                    )
-                                    Spacer(modifier = Modifier.width((8 * scaleFactor).dp))
-                                    Column {
-                                        Text(
-                                            text = audio.title,
-                                            color = Color.White,
-                                            fontSize = (16 * scaleFactor).sp,
-                                            maxLines = 1
+                if (selectedPlaylist == null) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(playlistList) { playlist ->
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { selectedPlaylist = playlist }
+                                        .padding(horizontal = (8 * scaleFactor).dp, vertical = (8 * scaleFactor).dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (playlist.imageUri != null) {
+                                        Image(
+                                            painter = rememberAsyncImagePainter(playlist.imageUri),
+                                            contentDescription = "Playlist Image",
+                                            modifier = Modifier
+                                                .size((60 * scaleFactor).dp)
+                                                .clip(RoundedCornerShape(8.dp)),
+                                            contentScale = ContentScale.Crop
                                         )
-                                        Text(
-                                            text = audio.artist ?: "Bilinmeyen Sanatçı",
-                                            color = Color.LightGray,
-                                            fontSize = (11 * scaleFactor).sp,
-                                            maxLines = 1
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.PlaylistPlay,
+                                            contentDescription = null,
+                                            tint = Color.LightGray,
+                                            modifier = Modifier.size((60 * scaleFactor).dp)
                                         )
                                     }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(
+                                        modifier = Modifier.weight(1f) // Text alanını genişletiyoruz
+                                    ) {
+                                        Text(
+                                            text = playlist.name,
+                                            color = Color.White,
+                                            fontSize = (18 * scaleFactor).sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Oynatma Listesi: ${playlist.songs.size} parça",
+                                            color = Color.Gray,
+                                            fontSize = (12 * scaleFactor).sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    // Oynatma butonu
+                                    IconButton(
+                                        onClick = {
+                                            onPlayPlaylist(playlist)
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Oynat",
+                                            tint = Color.Cyan,
+                                            modifier = Modifier.size((30 * scaleFactor).dp)
+                                        )
+                                    }
+
+                                    // Menü (üç nokta) butonu
+                                    Box {
+                                        IconButton(onClick = {
+                                            // Açılır menüyü toggle yapıyoruz
+                                            if (menuExpandedForPlaylist == playlist) {
+                                                menuExpandedForPlaylist = null
+                                            } else {
+                                                menuExpandedForPlaylist = playlist
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.MoreVert,
+                                                contentDescription = "Menü",
+                                                tint = Color.White,
+                                                modifier = Modifier.size((30 * scaleFactor).dp)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = menuExpandedForPlaylist == playlist,
+                                            onDismissRequest = { menuExpandedForPlaylist = null }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Oynatma Listesini Sil") },
+                                                onClick = {
+                                                    menuExpandedForPlaylist = null
+                                                    onDeletePlaylist(playlist)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Yeniden Adlandır") },
+                                                onClick = {
+                                                    menuExpandedForPlaylist = null
+                                                    newPlaylistName = playlist.name
+                                                    selectedPlaylist = null
+                                                    // Dialog açma state'ini set edeceğiz:
+                                                    showRenameDialogForPlaylist = true
+                                                    playlistToRename = playlist
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
+
                                 Divider(
                                     color = Color.DarkGray.copy(alpha = 0.6f),
                                     thickness = (1 * scaleFactor).dp,
-                                    modifier = Modifier.padding(top = (4 * scaleFactor).dp)
+                                    modifier = Modifier.padding(horizontal = (8 * scaleFactor).dp)
                                 )
+                            }
+                        }
+
+                        FloatingActionButton(
+                            onClick = { showAddDialog = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = "Yeni Oynatma Listesi")
+                        }
+                    }
+                } else {
+                    Column(Modifier.fillMaxSize()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = "< Geri",
+                                color = Color.Cyan,
+                                fontSize = (16 * scaleFactor).sp,
+                                modifier = Modifier
+                                    .clickable { selectedPlaylist = null }
+                                    .padding(8.dp)
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            Text(
+                                text = selectedPlaylist!!.name,
+                                color = Color.White,
+                                fontSize = (18 * scaleFactor).sp,
+                                modifier = Modifier.align(Alignment.CenterVertically)
+                            )
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            Box {
+                                IconButton(onClick = { menuExpandedForPlaylist = selectedPlaylist }) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "Menu",
+                                        tint = Color.White
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = menuExpandedForPlaylist == selectedPlaylist,
+                                    onDismissRequest = { menuExpandedForPlaylist = null }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Resmi Değiştir") },
+                                        onClick = {
+                                            menuExpandedForPlaylist = null
+                                            imagePickerLauncher.launch("image/*")
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        val songs = selectedPlaylist!!.songs
+                        if (songs.isEmpty()) {
+                            Box(
+                                Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Bu oynatma listesinde şarkı yok.",
+                                    color = Color.LightGray,
+                                    fontSize = (14 * scaleFactor).sp
+                                )
+                            }
+                        } else {
+                            LazyColumn(modifier = Modifier.weight(1f)) {
+                                items(songs) { audio ->
+                                    AudioFileItem(
+                                        audioFile = audio,
+                                        audioList = songs,                // <<< burada sadece o playlist'in şarkı listesi
+                                        playlists = playlists,
+                                        onAddToQueue = onAddToQueue,
+                                        onAddToPlaylist = onAddToPlaylist,
+                                        onRename = onRenameSong,
+                                        onDelete = onDeleteSong,
+                                        onSelectAudio = onSelectAudio,    // aynı 2-parametreli fonksiyonu geçir
+                                        onToggleFavorite = onToggleFavorite,
+                                        modifier = Modifier
+                                            .padding(vertical = (4 * scaleFactor).dp, horizontal = (4 * scaleFactor).dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -168,7 +372,54 @@ fun SongPickerPopup(
             }
         }
     }
+
+    if (showAddDialog) {
+        AddPlaylistDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = {
+                onAddPlaylist(it)
+                showAddDialog = false
+            }
+        )
+    }
+
+    // Playlist yeniden adlandırma için dialog
+
+
+    if (showRenameDialogForPlaylist && playlistToRename != null) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialogForPlaylist = false },
+            title = { Text("Oynatma Listesini Yeniden Adlandır") },
+            text = {
+                TextField(
+                    value = newPlaylistName,
+                    onValueChange = { newPlaylistName = it },
+                    label = { Text("Yeni İsim") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newPlaylistName.isNotBlank()) {
+                        onRenamePlaylist(playlistToRename!!, newPlaylistName)
+                    }
+                    showRenameDialogForPlaylist = false
+                    playlistToRename = null
+                }) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showRenameDialogForPlaylist = false
+                    playlistToRename = null
+                }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
 }
+
 
 
 @Composable
@@ -513,7 +764,261 @@ fun NextSongsPopup(
 }
 
 
+@Composable
+fun AddPlaylistDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var playlistName by remember { mutableStateOf("") }
 
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Color(0x80000000))
+            .clickable { onDismiss() }
+    ) {
+        Card(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(24.dp),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .background(Color(0xFF303030)),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Yeni Oynatma Listesi Oluştur",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                OutlinedTextField(
+                    value = playlistName,
+                    onValueChange = { playlistName = it },
+                    label = { Text("Liste Adı") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { onDismiss() }) {
+                        Text("İptal", color = Color.LightGray)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            if (playlistName.isNotBlank()) {
+                                onConfirm(playlistName.trim())
+                            }
+                        }
+                    ) {
+                        Text("Ekle", color = Color.Cyan)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun AudioFileItem(
+    audioFile: MusicPlayerViewModel.AudioFile,
+    audioList: List<MusicPlayerViewModel.AudioFile>, // Tüm listeyi parametre olarak alıyoruz
+    playlists: List<MusicPlayerViewModel.Playlist>,
+    onAddToQueue: (MusicPlayerViewModel.AudioFile) -> Unit,
+    onAddToPlaylist: (MusicPlayerViewModel.AudioFile, MusicPlayerViewModel.Playlist) -> Unit,
+    onRename: (MusicPlayerViewModel.AudioFile, String) -> Unit,
+    onDelete: (MusicPlayerViewModel.AudioFile) -> Unit,
+    onSelectAudio: (selectedAudio: MusicPlayerViewModel.AudioFile, fullList: List<MusicPlayerViewModel.AudioFile>) -> Unit,
+    onToggleFavorite: (MusicPlayerViewModel.AudioFile) -> Unit,
+    scaleFactor: Float = 1f,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val bitmap = remember(audioFile.uri) { getAlbumArt(context, audioFile.uri) }
+
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf(audioFile.title) }
+    var showPlaylistDialog by remember { mutableStateOf(false) }
+
+    // Favori mi kontrolü
+    val isFavorite = playlists.find { it.name == "Favoriler" }
+        ?.songs?.any { it.uri == audioFile.uri } == true
+
+    Column(modifier = modifier) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    // Şarkıya tıklayınca tüm liste ve seçilen şarkıyı yolluyoruz
+                    onSelectAudio(audioFile, audioList)
+                }
+                .padding(horizontal = (4 * scaleFactor).dp, vertical = (4 * scaleFactor).dp)
+        ) {
+            AlbumArtImage(
+                bitmap = bitmap,
+                modifier = Modifier.size((66 * scaleFactor).dp)
+            )
+
+            Spacer(modifier = Modifier.width((8 * scaleFactor).dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = audioFile.title,
+                    color = Color.White,
+                    fontSize = (20 * scaleFactor).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = audioFile.artist ?: "Bilinmeyen Sanatçı",
+                    color = Color.LightGray,
+                    fontSize = (11 * scaleFactor).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // BEĞENME BUTONU (kalp ikonu)
+            IconButton(onClick = { onToggleFavorite(audioFile) }) {
+                if (isFavorite) {
+                    Icon(
+                        imageVector = Icons.Filled.Favorite,
+                        contentDescription = "Favorilerden Kaldır",
+                        tint = Color.Red
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.FavoriteBorder,
+                        contentDescription = "Favorilere Ekle",
+                        tint = Color.White
+                    )
+                }
+            }
+
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Şarkı Menüsü",
+                        tint = Color.White
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Sıraya Ekle") },
+                        onClick = {
+                            menuExpanded = false
+                            onAddToQueue(audioFile)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Oynatma Listesine Ekle") },
+                        onClick = {
+                            menuExpanded = false
+                            showPlaylistDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Yeniden İsimlendir") },
+                        onClick = {
+                            menuExpanded = false
+                            showRenameDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Cihazdan Sil") },
+                        onClick = {
+                            menuExpanded = false
+                            onDelete(audioFile)
+                        }
+                    )
+                }
+            }
+        }
+
+        Divider(
+            color = Color.DarkGray.copy(alpha = 0.6f),
+            thickness = (1 * scaleFactor).dp,
+            modifier = Modifier.padding(top = (4 * scaleFactor).dp)
+        )
+    }
+
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Şarkı Adını Değiştir") },
+            text = {
+                TextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Yeni İsim") }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (newName.isNotBlank() && newName != audioFile.title) {
+                        onRename(audioFile, newName)
+                    }
+                    showRenameDialog = false
+                }) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    if (showPlaylistDialog) {
+        AlertDialog(
+            onDismissRequest = { showPlaylistDialog = false },
+            title = { Text("Oynatma Listesine Ekle") },
+            text = {
+                LazyColumn {
+                    items(playlists) { playlist ->
+                        Text(
+                            text = playlist.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onAddToPlaylist(audioFile, playlist)
+                                    showPlaylistDialog = false
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPlaylistDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+}
 
 
 
