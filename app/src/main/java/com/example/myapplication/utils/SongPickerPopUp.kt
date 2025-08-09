@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Icon
+import androidx.compose.material3.Icon
 import androidx.compose.material.TabRowDefaults.Divider
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
@@ -465,7 +465,11 @@ fun NextSongsPopup(
                                 .fillMaxSize()
                                 .offset { IntOffset(swipeWidth.roundToInt(), offsetY) }
                                 .background(if (isDragging) Color.DarkGray else Color.Transparent)
-                                .padding(horizontal = 8.dp),
+                                .padding(horizontal = 8.dp)
+                            .clickable {
+                            // Şarkıya tıklandığında oynatmayı tetikle
+                            musicPlayerVM.setAudio(audio, forcePlay = true)
+                        },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val bitmap = remember(audio.uri) {

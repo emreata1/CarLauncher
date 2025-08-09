@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.myapplication
 
 import android.annotation.SuppressLint
@@ -34,7 +36,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.core.content.edit
-import kotlin.math.sqrt
 
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalPagerApi::class)
@@ -77,7 +78,7 @@ fun CustomDrawer(
     val scope = rememberCoroutineScope()
 
     // Her item'ın ekran konumu tutuluyor (sürükleme için)
-    val itemPositions = rememberItemPositions(apps.size)
+    val itemPositions = rememberItemPositions()
 
     var draggingIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
@@ -258,10 +259,8 @@ fun calculateNearestIndex(currentIndex: Int, dragOffset: Offset, itemPositions: 
     }?.key
 }
 
-fun Offset.getDistance(): Float = sqrt(x * x + y * y)
-
 @Composable
-fun rememberItemPositions(size: Int): MutableMap<Int, Rect> = remember { mutableStateMapOf() }
+fun rememberItemPositions(): MutableMap<Int, Rect> = remember { mutableStateMapOf() }
 
 fun <T> paginateList(list: List<T>, pageSize: Int): List<List<T>> = list.chunked(pageSize)
 

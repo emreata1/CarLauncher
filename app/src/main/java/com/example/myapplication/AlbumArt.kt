@@ -23,7 +23,7 @@ fun getAlbumArt(context: Context, uri: Uri): Bitmap? {
             val artBytes = mmr.embeddedPicture
             artBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     } finally {
         mmr.release()

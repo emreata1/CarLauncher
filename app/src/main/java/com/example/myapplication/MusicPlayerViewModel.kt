@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.ContentUris
 import android.content.Context
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private var mediaPlayer: MediaPlayer? = null
+    @SuppressLint("StaticFieldLeak")
     private val context = application.applicationContext
 
     private val _audioFiles = mutableStateListOf<AudioFile>()
@@ -149,48 +151,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-
-    fun removeUpcomingAudioAt(index: Int) {
-        val upcomingList = _upcomingSongs.value.toMutableList()
-        if (index !in upcomingList.indices) return
-
-        val removedItem = upcomingList[index]
-        val isRemovedCurrentlyPlaying = removedItem.uri == _selectedAudio.value?.uri
-
-        upcomingList.removeAt(index)
-        _upcomingSongs.value = upcomingList
-
-        if (isRemovedCurrentlyPlaying) {
-            val newIndex = index.coerceAtMost(upcomingList.lastIndex)
-            val nextAudio = upcomingList.getOrNull(newIndex) ?: upcomingList.getOrNull(newIndex - 1)
-
-            if (nextAudio != null) {
-                setAudio(nextAudio, forcePlay = true)
-            } else {
-                stopAudio()
-            }
-        }
-    }
-
-
     fun seekTo(position: Long) {
         mediaPlayer?.seekTo(position.toInt())
         _currentPosition.value = position
-    }
-
-    fun moveUpcoming(fromIndex: Int, toIndex: Int) {
-        val upcomingList = _upcomingSongs.value.toMutableList()
-        if (fromIndex in upcomingList.indices && toIndex in upcomingList.indices) {
-            val item = upcomingList.removeAt(fromIndex)
-            val insertIndex = if (toIndex > fromIndex) toIndex - 1 else toIndex
-            upcomingList.add(insertIndex, item)
-            _upcomingSongs.value = upcomingList
-        }
-    }
-
-
-    fun selectAudio(audio: AudioFile) {
-        setAudio(audio, forcePlay = true)
     }
 
     fun updateUpcomingList(newList: List<AudioFile>) {
@@ -268,8 +231,12 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             return audioList
         }
     }
-    fun shuffleUpcomingSongs() {
-        _upcomingSongs.value = _upcomingSongs.value.shuffled()
+    fun shuffleUpcomingSongs(currentPlaying: AudioFile?) {
+        currentPlaying ?: return
+
+        val current = currentPlaying
+        val rest = _upcomingSongs.value.filter { it.uri != current.uri }.shuffled()
+        _upcomingSongs.value = listOf(current) + rest
     }
 
 }

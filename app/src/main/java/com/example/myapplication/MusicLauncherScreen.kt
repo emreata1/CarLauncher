@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,10 @@ import com.example.myapplication.utils.ExpandedSongInfoPopup
 import com.example.myapplication.utils.NextSongsPopup
 import com.example.myapplication.utils.SongPickerPopup
 import com.example.myapplication.utils.getAllLaunchableApps
+import kotlin.math.cbrt
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 @Composable
 fun MusicLauncherScreen(
@@ -37,7 +42,9 @@ fun MusicLauncherScreen(
     var audioFiles by remember { mutableStateOf(emptyList<AudioFile>()) }
 
     val speed by speedVm.speedKmh.collectAsState(initial = 0f)
-
+    val onUpdateUpcomingList: (List<AudioFile>) -> Unit = { newList ->
+        musicPlayerVM.updateUpcomingList(newList)
+    }
     // Buradaki vm değişkeni kaldırıldı çünkü musicPlayerVM zaten parametre olarak var
 
     // upcoming listesi mutableStateList olmadığı için LaunchedEffect ile takip etmek zor
@@ -48,7 +55,9 @@ fun MusicLauncherScreen(
     val isPlaying by musicPlayerVM.isPlaying.collectAsState()
     val currentPosition by musicPlayerVM.currentPosition.collectAsState()
     val totalDuration by musicPlayerVM.totalDuration.collectAsState()
-
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
     // Bu listeyi de state olarak tutuyoruz, getAllAudioFiles fonksiyonundan geliyor
     var audioList by remember { mutableStateOf(getAllAudioFiles(context)) }
 
@@ -75,36 +84,14 @@ fun MusicLauncherScreen(
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier
-                .size(180.dp)
+                .width(screenWidth * 0.20f)   // Genişliği ekran genişliğinin %30'u yap
                 .align(Alignment.Center)
         )
 
-        AnimatedCurvedLines()
+        AnimatedCurvedLines(lineLengthFraction = 0.6f)
 
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 56.dp, start = 60.dp, end = 60.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight(0.58f)
-                    .aspectRatio(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                AnalogClockWithNumbers(heightFraction = 0.57f)
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight(0.58f)
-                    .aspectRatio(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                SpeedometerScreen()
-            }
-        }
+        ResponsiveRow()
+
 
         Box(
             modifier = Modifier
@@ -149,11 +136,19 @@ fun MusicLauncherScreen(
                     // Şarkı Seçici Popup
                     SongPickerPopup(
                         audioFiles = audioFiles,
-                        onSelect = {
-                            musicPlayerVM.setAudio(it)
-                            showSongPicker = false
+                        onSelect = { selectedAudio ->
+                            val newUpcoming = audioFiles.let {
+                                val index = it.indexOfFirst { audio -> audio.uri == selectedAudio.uri }
+                                if (index == -1) it else it.drop(index)
+                            }
+                            // Seçilen şarkıyı oynat
+                            musicPlayerVM.setAudio(selectedAudio, forcePlay = true)
+
+                            // Sıradaki şarkılar listesini güncelle
+                            onUpdateUpcomingList(newUpcoming)  // Bu fonksiyon dışarıdan sağlanmalı
                         },
-                        onDismiss = { showSongPicker = false },
+
+                                onDismiss = { showSongPicker = false },
                         onRefresh = {
                             audioList = getAllAudioFiles(context)
                         },
@@ -174,7 +169,7 @@ fun MusicLauncherScreen(
                         onSeekTo = { musicPlayerVM.seekTo(it) },
                         onNext = { musicPlayerVM.playNext() },
                         onPrevious = { musicPlayerVM.playPrevious() },
-                        onShuffleNextSongs = { musicPlayerVM.shuffleUpcomingSongs() },
+                        onShuffleNextSongs = { musicPlayerVM.shuffleUpcomingSongs(selectedAudio) },
                         modifier = Modifier
                     )
                     val upcomingSongs by musicPlayerVM.upcomingSongs.collectAsState()
@@ -206,3 +201,47 @@ fun MusicLauncherScreen(
         }
     }
 }
+@Composable
+fun ResponsiveRow() {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.toFloat()
+    val screenWidth = configuration.screenWidthDp.toFloat()
+
+    val diag = sqrt(screenWidth * screenWidth + screenHeight * screenHeight)
+    val normDiag = ((diag - 360f) / (2000f - 360f)).coerceIn(0f, 1f)
+
+    val aspectRatio = screenWidth / screenHeight
+
+    val aspectWeight = when {
+        aspectRatio > 2f -> 0.8f
+        aspectRatio in 1.5f..2f -> 1.1f
+        aspectRatio in 1.0f..1.5f -> 1.0f
+        else -> 0.9f
+    }
+
+    val baseFraction = 0.20f
+    val widthRange = 0.15f
+
+    val adjustedWidthFraction = (baseFraction + widthRange * sqrt(normDiag)) * aspectWeight
+    val finalWidthFraction = adjustedWidthFraction.coerceIn(0.16f, 0.5f)
+
+    // Ekran genişliğinin %3'ü kadar padding (istediğin gibi ayarlayabilirsin)
+    val horizontalPaddingDp = (screenWidth * 0.03f).dp
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 56.dp, start = horizontalPaddingDp, end = horizontalPaddingDp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            AnalogClockWithNumbers(widthFraction = finalWidthFraction)
+        }
+        Box(contentAlignment = Alignment.Center) {
+            SpeedometerScreen(widthFraction = (finalWidthFraction + 0.01f).coerceAtMost(0.5f))
+        }
+    }
+}
+
+

@@ -3,6 +3,7 @@ package com.example.myapplication
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -30,6 +31,22 @@ import com.example.myapplication.utils.getConnectedWifiName
 import com.example.myapplication.utils.getCurrentTime
 import com.example.myapplication.utils.isBluetoothEnabled
 import kotlin.Unit
+import android.media.AudioManager
+import androidx.compose.material3.Slider
+import android.database.ContentObserver
+
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.max
 
 const val API_KEY = "ecd4bcb60b878b71d15d823d98fd955b" // OpenWeatherMap API anahtarın
 @SuppressLint("MissingPermission")
@@ -86,59 +103,20 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = {if (drawerOpen) {
-                            onCloseDrawer()  // drawer açıksa kapat
-                        } else {
-                            // İstersen başka işlem yapabilirsin (örneğin activity.finish() gibi)
-                        } }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        IconButton(onClick = {
-                            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                                addCategory(Intent.CATEGORY_HOME)
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            }
-                            context.startActivity(homeIntent)
-                        }) {
-                            Icon(Icons.Filled.Home, contentDescription = "Ana Ekran", tint = Color.White)
-                        }
-                    }
-                }
 
-                // Ortadaki metinler - 1/3 genişlik, ortalanmış
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Spacer(Modifier.width(16.dp))
                         Text(
-                            text = locationName,
+                            text = currentTime,
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 24.sp),
                             color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.align(Alignment.CenterVertically)
                         )
-                        Text(
-                            text = weatherInfo,
-                            color = Color.LightGray,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                // Sağ ikonlar + saat - 1/3 genişlik, sağa yaslanmış
-                // Sağ ikonlar + saat - 1/3 genişlik, sağa yaslanmış
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.width(16.dp))
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+
+
+
                             IconButton(
                                 onClick = {
                                     context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).apply {
@@ -190,14 +168,45 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
                         }
 
 
-                        Spacer(Modifier.width(16.dp))
+
+                    }
+                }
+
+                // Ortadaki metinler - 1/3 genişlik, ortalanmış
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = currentTime,
-                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 24.sp),
+                            text = locationName,
                             color = Color.White,
-                            modifier = Modifier.align(Alignment.CenterVertically)
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = weatherInfo,
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
+                }
+
+                // Sağ ikonlar + saat - 1/3 genişlik, sağa yaslanmış
+                // Sağ ikonlar + saat - 1/3 genişlik, sağa yaslanmış
+                Box(
+                    modifier = Modifier
+                        .weight(1f),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    VolumeSlider(
+                        modifier = Modifier.height(80.dp) // yüksekliği kontrol
+                    )
                 }
 
 
@@ -207,6 +216,89 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
 
 
 }
+
+
+
+
+
+@Composable
+fun VolumeSlider(
+    modifier: Modifier = Modifier,
+    trackHeight: Dp = 20.dp,
+    thumbSize: Dp = 40.dp
+) {
+    val context = LocalContext.current
+    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat()
+
+    var currentVolume by remember {
+        mutableStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat())
+    }
+
+    // Sistem ses değişikliklerini dinleme
+    val contentResolver = context.contentResolver
+    val volumeObserver = remember {
+        object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                super.onChange(selfChange, uri)
+                currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        contentResolver.registerContentObserver(
+            android.provider.Settings.System.CONTENT_URI,
+            true,
+            volumeObserver
+        )
+        onDispose {
+            contentResolver.unregisterContentObserver(volumeObserver)
+        }
+    }
+
+    Slider(
+        value = currentVolume,
+        onValueChange = { value ->
+            currentVolume = value
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, value.toInt(), 0)
+        },
+        valueRange = 0f..maxVolume,
+        modifier = modifier
+            .fillMaxWidth(0.9f)
+            .height(max(thumbSize, trackHeight))
+            .padding(horizontal = (thumbSize / 2)),
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(thumbSize)
+                    .clip(CircleShape) // Önce tamamen yuvarlak yap
+                    .background(Color.Red) // Arka plan rengi
+                    .border(width = 2.dp, color = Color.White, shape = CircleShape), // Çerçeve
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (currentVolume <= 0f) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                    contentDescription = "Ses",
+                    tint = Color.White,
+                    modifier = Modifier.size((thumbSize.value * 0.6f).dp)
+                )
+            }
+        }
+        ,
+        track = { sliderState ->
+            SliderDefaults.Track(
+                sliderState = sliderState,
+                modifier = Modifier.height(trackHeight),
+                colors = SliderDefaults.colors(
+                    activeTrackColor = Color.Black, // aktif kısım
+                    inactiveTrackColor = Color.Gray // pasif kısım
+                )
+            )
+        }
+    )
+}
+
 
 
 
