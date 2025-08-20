@@ -28,6 +28,8 @@ import androidx.compose.runtime.Composable
 import com.astechsoft.carlauncher.utils.AnimatedCurvedLines
 import com.astechsoft.carlauncher.viewmodels.MusicPlayerViewModel
 import com.astechsoft.carlauncher.viewmodels.SpeedViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -49,15 +51,17 @@ fun MusicLauncherScreen(
     val totalDuration by musicPlayerVM.totalDuration.collectAsState()
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    var audioList by remember { mutableStateOf(getAllAudioFiles(context)) }
+    var audioList by remember { mutableStateOf<List<AudioFile>>(emptyList()) }
     var showSongPicker by remember { mutableStateOf(false) }
     val currentPlaying by musicPlayerVM.selectedAudio.collectAsState()
-    val upcomingSongs by musicPlayerVM.upcomingSongs.collectAsState()
+    val upcomingSongs = musicPlayerVM.upcomingSongs
 
     LaunchedEffect(Unit) {
         audioFiles = getAllAudioFiles(context)
         musicPlayerVM.setAudioFiles(audioFiles)
-
+        audioList = withContext(Dispatchers.IO) {
+            getAllAudioFiles(context) // burası artık arka planda çalışıyor
+        }
         if (selectedAudio == null && audioFiles.isNotEmpty()) {
             musicPlayerVM.setAudio(audioFiles.first())
         }

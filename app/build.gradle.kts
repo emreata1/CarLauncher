@@ -90,7 +90,7 @@ dependencies {
     implementation (libs.androidx.lifecycle.viewmodel.compose)
     implementation (libs.androidx.lifecycle.runtime.ktx.v280)
     implementation(libs.reorderable)
-
+    implementation("com.google.android.material:material:1.9.0")
     implementation(libs.gson)
 }
 

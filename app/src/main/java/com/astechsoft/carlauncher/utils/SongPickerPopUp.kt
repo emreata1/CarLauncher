@@ -518,7 +518,10 @@ fun NextSongsPopup(
     selectedAudio: AudioFile
 ) {
     val context = LocalContext.current
-    val list = remember(upcoming) { mutableStateListOf<AudioFile>().apply { addAll(upcoming) } }
+
+    // list artık direkt upcoming'dan türetiliyor
+    val list by remember(upcoming) { derivedStateOf { upcoming.toMutableStateList() } }
+
     val swipeOffsetX = remember { mutableStateListOf<Float>().apply { repeat(list.size) { add(0f) } } }
     var draggingIndex by remember { mutableIntStateOf(-1) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -541,6 +544,8 @@ fun NextSongsPopup(
             listState.animateScrollToItem(index)
         }
     }
+
+    // artık LaunchedEffect(upcoming) gerek yok
 
     fun swapItems(from: Int, to: Int) {
         if (from == to) return
