@@ -1,14 +1,14 @@
+@file:Suppress("DEPRECATION")
 package com.astechsoft.carlauncher.viewmodels
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.app.PendingIntent
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.provider.MediaStore
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -22,8 +22,9 @@ import kotlinx.coroutines.flow.StateFlow
 import android.app.Service
 import android.content.Intent
 import android.media.AudioManager
+import android.os.Bundle
 import android.os.IBinder
-import com.astechsoft.carlauncher.viewmodels.MusicPlayerViewModel
+import android.view.KeyEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.viewModelScope
@@ -32,11 +33,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MusicPlayerViewModel(application: Application) : AndroidViewModel(application) {
-
     private var mediaPlayer: MediaPlayer? = null
     @SuppressLint("StaticFieldLeak")
     private val context = application.applicationContext
-
     private val _audioFiles = mutableStateListOf<AudioFile>()
     private var currentIndex = 0
 
@@ -60,9 +59,9 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private var positionJob: Job? = null
 
-
-
-
+    private val sharedPrefs = context.getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)
+    private val gsonForPrefs = Gson()
+    private var isRestoringState = false
     private val playlistStorage = PlaylistStorage(context)
 
     private lateinit var mediaSession: MediaSessionCompat
@@ -107,15 +106,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    val audioFiles: List<AudioFile> get() = _audioFiles
 
-    fun loadAudioFilesOnce(context: Context) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val files = getAllAudioFiles(context)
-            _audioFiles.clear()
-            _audioFiles.addAll(files)
-        }
-    }
     private fun updatePlaybackState(state: Int) {
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
@@ -157,20 +148,26 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         _upcomingSongs.clear()
         _upcomingSongs.addAll(files)
 
-        if (_audioFiles.isNotEmpty()) {
+        loadLastPlaybackState()
+        val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val autoPlayOnLaunch = prefs.getBoolean("auto_play_on_launch", false)
+        if (_selectedAudio.value == null && _audioFiles.isNotEmpty()) {
             currentIndex = 0
-            setAudio(_audioFiles[currentIndex], forcePlay = true)
+            setAudio(_audioFiles[currentIndex], forcePlay = autoPlayOnLaunch)
+        } else {
+            _selectedAudio.value?.let { setAudio(it, forcePlay = autoPlayOnLaunch) }
         }
     }
 
+
     fun setAudio(audio: AudioFile, forcePlay: Boolean = false) {
-        if (!forcePlay && _selectedAudio.value?.uri == audio.uri) return
+        if (!forcePlay && _selectedAudio.value?.uri == audio.uri && mediaPlayer != null) return
 
         _selectedAudio.value = audio
         _currentPosition.value = 0L
         _isPlaying.value = false
         _totalDuration.value = 0L
-
+        savePlaybackState()
         try {
             if (mediaPlayer == null) mediaPlayer = MediaPlayer()
             mediaPlayer?.reset()
@@ -178,10 +175,15 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
             mediaPlayer?.setOnPreparedListener { player ->
                 _totalDuration.value = player.duration.toLong()
-                player.start()
-                _isPlaying.value = true
-                startUpdatingPosition()
-                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                if (forcePlay) {
+                    player.start()
+                    _isPlaying.value = true
+                    startUpdatingPosition()
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                } else {
+                    _isPlaying.value = false
+                    updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+                }
             }
 
             mediaPlayer?.setOnCompletionListener {
@@ -199,31 +201,23 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-
-    fun selectFirstAudioIfNone(files: List<AudioFile>) {
-        if (_selectedAudio.value == null && files.isNotEmpty()) {
-            _selectedAudio.value = files.first()
-        }
-    }
-
     fun playPause(play: Boolean? = null) {
         mediaPlayer?.let {
             val shouldPlay = play ?: !it.isPlaying
             if (shouldPlay && !it.isPlaying) {
                 it.start()
                 _isPlaying.value = true
-                startUpdatingPosition() // Handler yerine
+                startUpdatingPosition()
                 updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
             } else if (!shouldPlay && it.isPlaying) {
                 it.pause()
                 _isPlaying.value = false
-                stopUpdatingPosition() // Handler yerine
+                stopUpdatingPosition()
                 updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
             }
-
+            savePlaybackState()
         }
     }
-
     fun playNext() {
         val currentAudio = _selectedAudio.value ?: return
         val upcomingList = _upcomingSongs.toList() // immutable kopya alıyoruz
@@ -232,6 +226,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             val nextIndex = (upcomingIndex + 1) % upcomingList.size
             setAudio(upcomingList[nextIndex], forcePlay = true)
         }
+        savePlaybackState()
     }
     fun playPlaylist(playlist: Playlist) {
         if (playlist.songs.isNotEmpty()) {
@@ -239,6 +234,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             _upcomingSongs.addAll(playlist.songs)
             setAudio(playlist.songs[0], forcePlay = true)
         }
+        savePlaybackState()
     }
     fun selectAudioAndPlayFromHere(selectedAudio: AudioFile, fullList: List<AudioFile>) {
         val startIndex = fullList.indexOfFirst { it.uri == selectedAudio.uri }
@@ -248,16 +244,19 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
         updateUpcomingList(newQueue)
         setAudio(selectedAudio, forcePlay = true)
+        savePlaybackState()
+
     }
     fun playPrevious() {
         val currentAudio = _selectedAudio.value ?: return
-        val upcomingList = _upcomingSongs.toList() // SnapshotStateList’i kopyala
+        val upcomingList = _upcomingSongs.toList()
         val upcomingIndex = upcomingList.indexOfFirst { it.uri == currentAudio.uri }
 
         if (upcomingIndex > 0) {
             val previousAudio = upcomingList[upcomingIndex - 1]
             setAudio(previousAudio, forcePlay = true)
         }
+        savePlaybackState()
     }
 
     fun seekTo(position: Long) {
@@ -268,10 +267,12 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun updateUpcomingList(newList: List<AudioFile>) {
         _upcomingSongs.clear()
         _upcomingSongs.addAll(newList)
+        savePlaybackState()
+
     }
 
     private fun releasePlayer() {
-        stopUpdatingPosition() // Coroutine ile pozisyon güncellemesini durdur
+        stopUpdatingPosition()
         mediaPlayer?.let {
             try {
                 if (it.isPlaying) it.stop()
@@ -316,6 +317,8 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             _playlists.add(Playlist(name, songs))
             playlistStorage.savePlaylists(_playlists)
         }
+        savePlaybackState()
+
     }
 
     fun changePlaylistImage(playlist: Playlist, imageUri: Uri) {
@@ -328,14 +331,18 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun shuffleUpcomingSongs(currentPlaying: AudioFile?) {
-        currentPlaying ?: return
-
-        val current = currentPlaying
+        val current = currentPlaying ?: return
         val rest = _upcomingSongs.filter { it.uri != current.uri }.shuffled()
 
+        val newQueue = listOf(current) + rest
         _upcomingSongs.clear()
-        _upcomingSongs.add(current)
-        _upcomingSongs.addAll(rest)
+        _upcomingSongs.addAll(newQueue)
+
+        if (_isPlaying.value) {
+            setAudio(current, forcePlay = true)
+        }
+        savePlaybackState()
+
     }
 
     class PlaylistStorage(private val context: Context) {
@@ -356,7 +363,6 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
             return gson.fromJson(json, type)
         }
     }
-
 
     companion object {
         suspend fun getAllAudioFiles(context: Context): List<AudioFile> = withContext(
@@ -391,10 +397,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     val artist = it.getString(artistIndex) ?: "Bilinmiyor"
                     val album = it.getString(albumIndex) ?: "Bilinmiyor"
                     val duration = it.getLong(durationIndex).takeIf { d -> d > 0 } ?: 0L
-
-
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
-
                     audioList.add(AudioFile(title, artist, contentUri.toString(), album, duration))
                 }
             }
@@ -431,7 +434,7 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun addToQueue(song: AudioFile) {
-        _upcomingSongs.add(song) // duplicate serbest
+        _upcomingSongs.add(song)
     }
 
     fun deleteSongFromDevice(audioFile: AudioFile): Boolean {
@@ -498,8 +501,74 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun savePlaybackState() {
+        if (isRestoringState) {
+            return
+        }
+        val current = _selectedAudio.value ?: run {
+            return
+        }
+        val index = _upcomingSongs.indexOfFirst { it.uriString == current.uriString }
+        if (index == -1) {
+            return
+        }
+        val editor = sharedPrefs.edit()
+        editor.putString("last_audio_uri", current.uriString)
+        editor.putInt("last_audio_index", index)
+        val upcomingUriList = _upcomingSongs.map { it.uriString }
+        val upcomingJson = gsonForPrefs.toJson(upcomingUriList)
+        editor.putString("last_upcoming_json", upcomingJson)
+
+        editor.apply()
+    }
+
+    fun loadLastPlaybackState() {
+        isRestoringState = true
+        val lastAudioUri = sharedPrefs.getString("last_audio_uri", null)
+        val upcomingJson = sharedPrefs.getString("last_upcoming_json", null)
+        if (!upcomingJson.isNullOrEmpty()) {
+            try {
+                val uriListType = object : TypeToken<List<String>>() {}.type
+                val savedUriList: List<String> = gsonForPrefs.fromJson(upcomingJson, uriListType)
+                val restoredUpcoming = savedUriList.mapNotNull { uriStr ->
+                    _audioFiles.find { it.uriString == uriStr }
+                }
+                if (restoredUpcoming.isNotEmpty()) {
+                    _upcomingSongs.clear()
+                    _upcomingSongs.addAll(restoredUpcoming)
+                }
+            } catch (e: Exception) {
+            }
+        }
+
+        if (lastAudioUri != null) {
+            val audioInUpcoming = _upcomingSongs.find { it.uriString == lastAudioUri }
+            if (audioInUpcoming != null) {
+                _selectedAudio.value = audioInUpcoming
+                currentIndex = _upcomingSongs.indexOf(audioInUpcoming)
+            } else {
+                val audioGlobal = _audioFiles.find { it.uriString == lastAudioUri }
+                if (audioGlobal != null) {
+                    _selectedAudio.value = audioGlobal
+                    currentIndex = _audioFiles.indexOf(audioGlobal)
+                    if (_upcomingSongs.isEmpty() && _audioFiles.isNotEmpty()) {
+                        _upcomingSongs.clear()
+                        _upcomingSongs.addAll(_audioFiles)
+                        currentIndex = _audioFiles.indexOf(audioGlobal)
+                    }
+                }
+            }
+        }
+        if (_upcomingSongs.isNotEmpty()) {
+            if (currentIndex < 0 || currentIndex >= _upcomingSongs.size) currentIndex = 0
+            _selectedAudio.value = _upcomingSongs.getOrNull(currentIndex) ?: _selectedAudio.value
+        }
+
+        isRestoringState = false
+    }
+
     fun stopAudio() {
-        stopUpdatingPosition() // Coroutine ile pozisyon güncellemesini durdur
+        stopUpdatingPosition()
         try {
             mediaPlayer?.stop()
             mediaPlayer?.release()
@@ -514,61 +583,116 @@ class MusicPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
 }
-
 class MusicPlayerService : Service() {
-
     private lateinit var mediaSession: MediaSessionCompat
     lateinit var musicPlayerViewModel: MusicPlayerViewModel
+    private lateinit var audioManager: AudioManager
+    private var maxVolume = 0
 
     override fun onCreate() {
         super.onCreate()
-
         musicPlayerViewModel = MusicPlayerViewModel(application)
-
-        // MediaSession kur
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        initMediaSession()
+        requestAudioFocus()
+    }
+    private fun initMediaSession() {
         mediaSession = MediaSessionCompat(this, "CarLauncherSession").apply {
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
                         MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
             )
-
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
                     requestAudioFocus()
                     musicPlayerViewModel.playPause(true)
                 }
-
                 override fun onPause() {
                     musicPlayerViewModel.playPause(false)
                 }
-
                 override fun onSkipToNext() {
                     musicPlayerViewModel.playNext()
                 }
-
                 override fun onSkipToPrevious() {
                     musicPlayerViewModel.playPrevious()
+                }
+                override fun onSeekTo(pos: Long) {
+                    musicPlayerViewModel.seekTo(pos)
+                }
+                override fun onStop() {
+                    musicPlayerViewModel.stopAudio()
+                }
+                override fun onCustomAction(action: String, extras: Bundle?) {
+                    when (action) {
+                        "VOLUME_UP" -> adjustVolume(AudioManager.ADJUST_RAISE)
+                        "VOLUME_DOWN" -> adjustVolume(AudioManager.ADJUST_LOWER)
+                        "VOLUME_MUTE" -> mute(true)
+                        "VOLUME_UNMUTE" -> mute(false)
+                        "SET_VOLUME" -> { extras?.getInt("volume")?.let { setVolume(it) } }
+                    }
+                }
+                override fun onMediaButtonEvent(mediaButtonIntent: Intent?): Boolean {
+                    val keyEvent = mediaButtonIntent?.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+                    keyEvent?.let {
+                        if (it.action == KeyEvent.ACTION_DOWN) {
+                            when (it.keyCode) {
+                                KeyEvent.KEYCODE_VOLUME_UP -> adjustVolume(AudioManager.ADJUST_RAISE)
+                                KeyEvent.KEYCODE_VOLUME_DOWN -> adjustVolume(AudioManager.ADJUST_LOWER)
+                            }
+                        }
+                    }
+                    return super.onMediaButtonEvent(mediaButtonIntent)
                 }
             })
 
             isActive = true
+            val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
+            mediaButtonIntent.setClass(this@MusicPlayerService, MusicPlayerService::class.java)
+            val pendingIntent = PendingIntent.getService(
+                this@MusicPlayerService,
+                0,
+                mediaButtonIntent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            setMediaButtonReceiver(pendingIntent)
         }
-
-        // Audio Focus iste
-        requestAudioFocus()
     }
 
+    private fun adjustVolume(direction: Int) {
+        audioManager.adjustStreamVolume(
+            AudioManager.STREAM_MUSIC,
+            direction,
+            AudioManager.FLAG_SHOW_UI
+        )
+    }
+    private fun mute(mute: Boolean) {
+        if (mute) {
+            audioManager.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                AudioManager.ADJUST_MUTE,
+                AudioManager.FLAG_SHOW_UI
+            )
+        } else {
+            audioManager.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                AudioManager.ADJUST_UNMUTE,
+                AudioManager.FLAG_SHOW_UI
+            )
+        }
+    }
+    private fun setVolume(volume: Int) {
+        val newVolume = volume.coerceIn(0, maxVolume)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, AudioManager.FLAG_SHOW_UI)
+    }
     private fun requestAudioFocus() {
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         audioManager.requestAudioFocus(
-            { }, // AudioFocusChangeListener boş bırakılabilir
+            { },
             AudioManager.STREAM_MUSIC,
             AudioManager.AUDIOFOCUS_GAIN
         )
     }
-
     override fun onBind(intent: Intent?): IBinder? = null
-
     override fun onDestroy() {
         super.onDestroy()
         mediaSession.release()

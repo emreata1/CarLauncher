@@ -21,6 +21,11 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs("src/main/java/com/astechsoft/carlauncher/assets")
+        }
+    }
 
     buildTypes {
         release {
@@ -92,5 +97,6 @@ dependencies {
     implementation(libs.reorderable)
     implementation("com.google.android.material:material:1.9.0")
     implementation(libs.gson)
+    implementation(libs.androidx.core.splashscreen)
 }
 

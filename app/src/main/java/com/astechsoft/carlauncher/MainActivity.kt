@@ -1,7 +1,6 @@
 package com.astechsoft.carlauncher
 
 import android.Manifest
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -14,7 +13,6 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
@@ -37,7 +35,6 @@ class MainActivity : AppCompatActivity() {
     private var hasLocationPermission by mutableStateOf(false)
     private var hasStoragePermission by mutableStateOf(false)
     private var hasNearbyPermission by mutableStateOf(false)
-    private var isLocationProviderAvailable by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -56,12 +53,13 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             var drawerOpen by remember { mutableStateOf(false) }
+            var settingsOpen by remember { mutableStateOf(false)}
             val isDefaultLauncher = isThisAppDefaultLauncher()
             var showLauncherDialog by remember { mutableStateOf(!isDefaultLauncher) }
             Column(modifier = Modifier.fillMaxSize()) {
                 CustomTopBar(drawerOpen = drawerOpen, onCloseDrawer = { drawerOpen = false })
 
-                if (!hasLocationPermission || !hasStoragePermission || !hasNearbyPermission || !isLocationProviderAvailable) {
+                if (!hasLocationPermission || !hasStoragePermission || !hasNearbyPermission ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -82,8 +80,10 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     MusicLauncherScreen(
                         drawerOpen = drawerOpen,
+                        settingsOpen = settingsOpen,
                         onToggleDrawer = { drawerOpen = !drawerOpen },
-                        onCloseDrawer = { drawerOpen = false }
+                        onCloseDrawer = { drawerOpen = false },
+                        onOpenSettings = { settingsOpen = !settingsOpen}
                     )
                 }
 
@@ -95,7 +95,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        startMusicService()
     }
 
     override fun onResume() {
@@ -142,7 +141,6 @@ class MainActivity : AppCompatActivity() {
             ) == PackageManager.PERMISSION_GRANTED
         } else true
 
-        isLocationProviderAvailable = isAnyLocationProviderEnabled()
     }
 
     private fun startMusicService() {
@@ -157,6 +155,7 @@ class MainActivity : AppCompatActivity() {
             locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
                     locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         } catch (e: Exception) {
+            false
             false
         }
     }

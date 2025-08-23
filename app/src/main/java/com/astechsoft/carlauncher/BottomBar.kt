@@ -1,7 +1,6 @@
 package com.astechsoft.carlauncher
 
 import android.annotation.SuppressLint
-import android.media.AudioManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,9 +10,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -32,7 +31,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +43,7 @@ import androidx.compose.ui.zIndex
 fun CustomBottomBar(
     modifier: Modifier = Modifier,
     onDrawerToggle: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenSongPicker: () -> Unit,
     isPlaying: Boolean = false,
     trackName: String = "Parça İsmi",
@@ -55,10 +54,8 @@ fun CustomBottomBar(
     onNext: () -> Unit = {},
     onPrevious: () -> Unit = {},
     onSeekTo: (Long) -> Unit = {},
+    onShuffleNextSongs: () -> Unit = {}
 ) {
-    val context = LocalContext.current
-    val audioManager = remember { context.getSystemService(AudioManager::class.java) }
-    fun volumeUp() = audioManager?.adjustVolume(AudioManager.ADJUST_RAISE, AudioManager.FLAG_PLAY_SOUND)
 
     Row(
         modifier = modifier
@@ -177,29 +174,54 @@ fun CustomBottomBar(
                     Icon(Icons.Default.SkipNext, contentDescription = "Sonraki", tint = Color.White)
                 }
                 Spacer(Modifier.width(4.dp))
-                IconButton(onClick = { volumeUp() }) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Ses Aç", tint = Color.White)
+                IconButton(onClick = onShuffleNextSongs) {
+                    Icon(Icons.Default.Shuffle, contentDescription = "Karıştır", tint = Color.White)
                 }
+
             }
         }
 
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            Button(
-                onClick = onDrawerToggle,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                modifier = Modifier.size(70.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.appdrawer),
-                    contentDescription = "App Drawer",
-                    modifier = Modifier.size(24.dp),
-                    tint = Color.White // ← burası eklendi
-                )
-            }
+                // Ayarlar Butonu
+                IconButton(
+                    onClick = onOpenSettings,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings, // Compose hazır ikon
+                        contentDescription = "Ayarlar",
+                        modifier = Modifier.size(24.dp),
+                        tint = Color.White
+                    )
+                }
 
+                Spacer(Modifier.width(8.dp))
+
+                // App Drawer Butonu
+                Button(
+                    onClick = onDrawerToggle,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    modifier = Modifier.size(70.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.appdrawer),
+                        contentDescription = "App Drawer",
+                        modifier = Modifier.size(24.dp),
+                        tint = Color.White
+                    )
+                }
+            }
         }
     }
 }
+
 
 
 @Composable
@@ -220,9 +242,10 @@ fun CompactBottomBar(
 
     Column(
         modifier = modifier
-            .background(Color(0xFF303030))
-            .fillMaxHeight(),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color(0xFF303030)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center // <-- Dikeyde ortala
+
     ) {
 
         var columnWidth by remember { mutableIntStateOf(0) }
@@ -233,7 +256,8 @@ fun CompactBottomBar(
                 .clickable { onOpenSongPicker() }
                 .padding(horizontal = 6.dp)
                 .onSizeChanged { columnWidth = it.width },
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+
         ) {
             val density = LocalDensity.current
             val trackFontSize = with(density) { (columnWidth * 0.1f).toSp() }

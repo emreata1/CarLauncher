@@ -21,6 +21,9 @@ import androidx.core.graphics.withSave
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextPainter.paint
+import androidx.core.content.res.ResourcesCompat
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -33,6 +36,8 @@ fun AnalogClockWithNumbers(
     val sizeDp = (screenWidthDp * widthFraction).dp
     val radiusPx = with(LocalDensity.current) { sizeDp.toPx() / 2f }
     val animatedSecond = remember { Animatable(35f) }
+    val context = LocalContext.current
+    val typeface = ResourcesCompat.getFont(context, R.font.anton)
 
     LaunchedEffect(Unit) {
         delay(1000)
@@ -114,8 +119,8 @@ fun AnalogClockWithNumbers(
                 val isMainMark = i == 0 || i == 15 || i == 30 || i == 45
 
                 val length = when {
-                    isMainMark -> radiusPx * 0.18f
-                    isHourMark -> radiusPx * 0.13f
+                    isMainMark -> radiusPx * 0.08f
+                    isHourMark -> radiusPx * 0.18f
                     else -> radiusPx * 0.05f
                 }
                 val stroke = when {
@@ -136,6 +141,33 @@ fun AnalogClockWithNumbers(
 
                 if (isHourMark) {
                     drawLineWithMetallicEffect(start, end, stroke)
+
+                    val number = when(i) {
+                        0 -> "12"
+                        15 -> "3"
+                        30 -> "6"
+                        45 -> "9"
+                        else -> ""
+                    }
+                    if (number.isNotEmpty()) {
+                        drawContext.canvas.nativeCanvas.apply {
+                            val paint = android.graphics.Paint().apply {
+                                textSize = 64f
+                                color = android.graphics.Color.WHITE
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                isAntiAlias = true
+                                this.typeface =typeface
+}
+
+                            val fm = paint.fontMetrics
+                            val textX = cx + cos(angleRad).toFloat() * (radiusPx - length - 28f) // 4f ile çizgiye çok yakın
+                            val textY = cy + sin(angleRad).toFloat() * (radiusPx - length - 36f) - (fm.ascent + fm.descent) / 2
+
+                            drawText(number, textX, textY, paint)
+                        }
+                    }
+
+
                 } else {
                     drawLine(
                         color = Color.Red,

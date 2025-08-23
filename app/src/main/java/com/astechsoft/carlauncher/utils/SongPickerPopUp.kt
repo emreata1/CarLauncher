@@ -47,8 +47,11 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
@@ -59,7 +62,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -76,8 +78,9 @@ import androidx.compose.ui.unit.IntOffset
 import coil.compose.rememberAsyncImagePainter
 import com.astechsoft.carlauncher.CompactBottomBar
 import com.astechsoft.carlauncher.viewmodels.MusicPlayerViewModel
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-
+import kotlin.math.abs
 @Composable
 fun SongPickerPopup(
     audioFiles: List<AudioFile>,
@@ -103,7 +106,6 @@ fun SongPickerPopup(
     val screenHeightDp = configuration.screenHeightDp
     val baseHeightDp = 800f
     val scaleFactor = (screenHeightDp / baseHeightDp) * 1.5f
-    val context = LocalContext.current
     val allPlaylist = remember(audioFiles) { MusicPlayerViewModel.Playlist("Tüm Şarkılar", audioFiles) }
     val playlistList by remember {
         derivedStateOf { listOf(allPlaylist) + playlists }
@@ -173,7 +175,7 @@ fun SongPickerPopup(
                                         )
                                     } else {
                                         Icon(
-                                            imageVector = Icons.Default.PlaylistPlay,
+                                            imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
                                             contentDescription = null,
                                             tint = Color.LightGray,
                                             modifier = Modifier.size((60 * scaleFactor).dp)
@@ -427,7 +429,6 @@ fun ExpandedSongInfoPopup(
     Box(
         modifier
             .fillMaxWidth(0.4f)
-            .fillMaxHeight()
     ) {
         Box(
             Modifier
@@ -445,29 +446,32 @@ fun ExpandedSongInfoPopup(
                 .align(Alignment.Center)
                 .padding(bottom = 56.dp)
                 .zIndex(1f),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(10.dp)
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 12.dp,
+                pressedElevation = 16.dp,
+                focusedElevation = 14.dp,
+                hoveredElevation = 14.dp
+            )
         ) {
-            var albumArtWidth by remember { mutableIntStateOf(0) }
 
             Column(
-                Modifier
+                modifier = Modifier
                     .background(Color(0xFF303030))
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(16.dp)
+                    .fillMaxHeight(), // Column'un yüksekliği ekranı kapsasın
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center // Dikeyde ortala
             ) {
-                Spacer(
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .onSizeChanged { albumArtWidth = it.width }
-                        .height(with(LocalDensity.current) { (albumArtWidth * 0.05f).toDp() })
-                )
-
+                Spacer(modifier = modifier.height(16.dp))
                 Box(
                     modifier = Modifier
+                        .weight(0.6f)
                         .fillMaxWidth(0.7f)
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.3f))
+                    ,
                     contentAlignment = Alignment.Center
                 ) {
                     val bitmap = remember(selectedAudio.uri) {
@@ -479,32 +483,35 @@ fun ExpandedSongInfoPopup(
                     )
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
 
-                CompactBottomBar(
-                    modifier = Modifier.fillMaxWidth(0.9f),
-                    isPlaying = isPlaying,
-                    trackName = selectedAudio.title,
-                    artistName = selectedAudio.artist,
-                    currentPosition = currentPosition,
-                    totalDuration = totalDuration,
-                    onPlayPauseToggle = onPlayPauseToggle,
-                    onNext = onNext,
-                    onPrevious = onPrevious,
-                    onSeekTo = onSeekTo,
-                    onOpenSongPicker = onOpenSongPicker,
-                    onShuffleNextSongs = onShuffleNextSongs
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(0.4f)
+                ) {
+                    CompactBottomBar(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .padding(horizontal = 8.dp),
+                        isPlaying = isPlaying,
+                        trackName = selectedAudio.title,
+                        artistName = selectedAudio.artist,
+                        currentPosition = currentPosition,
+                        totalDuration = totalDuration,
+                        onPlayPauseToggle = onPlayPauseToggle,
+                        onNext = onNext,
+                        onPrevious = onPrevious,
+                        onSeekTo = onSeekTo,
+                        onOpenSongPicker = onOpenSongPicker,
+                        onShuffleNextSongs = onShuffleNextSongs
+                    )
+                }
             }
         }
     }
 }
 
-enum class Direction {
-    Horizontal, Vertical
-}
 
-private var isRemoving = false
 
 @Composable
 fun NextSongsPopup(
@@ -519,70 +526,55 @@ fun NextSongsPopup(
 ) {
     val context = LocalContext.current
 
-    // list artık direkt upcoming'dan türetiliyor
-    val list by remember(upcoming) { derivedStateOf { upcoming.toMutableStateList() } }
+    // 🔹 Artık kendi "list" state'ini tutmuyoruz, direkt upcoming ile çalışıyoruz
+    val swipeOffsetMap = remember { mutableStateMapOf<String, Float>() }
+    LaunchedEffect(upcoming) {
+        val keys = upcoming.map { it.uri.toString() }.toSet()
+        keys.forEach { if (it !in swipeOffsetMap) swipeOffsetMap[it] = 0f }
+        swipeOffsetMap.keys.filter { it !in keys }.forEach { swipeOffsetMap.remove(it) }
+    }
 
-    val swipeOffsetX = remember { mutableStateListOf<Float>().apply { repeat(list.size) { add(0f) } } }
-    var draggingIndex by remember { mutableIntStateOf(-1) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-    var gestureDirection by remember { mutableStateOf<Direction?>(null) }
+    var draggingItemUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
     var isRemoving by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val listState = rememberLazyListState()
-    var parentHeightPx by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(list.size) {
-        if (swipeOffsetX.size != list.size) {
-            swipeOffsetX.clear()
-            swipeOffsetX.addAll(List(list.size) { 0f })
-        }
+    var parentHeightPx by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(currentPlaying, upcoming) {
+        val idx = upcoming.indexOfFirst { it.uri == currentPlaying?.uri }
+        if (idx != -1) listState.animateScrollToItem(idx)
     }
 
-    LaunchedEffect(currentPlaying, list) {
-        val index = list.indexOfFirst { it.uri == currentPlaying?.uri }
-        if (index != -1) {
-            listState.animateScrollToItem(index)
-        }
-    }
-
-    // artık LaunchedEffect(upcoming) gerek yok
-
-    fun swapItems(from: Int, to: Int) {
+    fun moveItem(from: Int, to: Int) {
         if (from == to) return
-        list.apply {
-            add(to, removeAt(from))
-        }
-        onListChanged(list.toList())
-        draggingIndex = to
-        dragOffsetY = 0f
+        if (from !in upcoming.indices) return
+        val newList = upcoming.toMutableList()
+        val item = newList.removeAt(from)
+        val insertIdx = to.coerceIn(0, newList.size)
+        newList.add(insertIdx, item)
+        onListChanged(newList)
     }
 
-    fun removeItem(index: Int) {
+    fun removeItemByIndex(index: Int) {
         if (isRemoving) return
-        if (index !in list.indices) return
-
+        if (index !in upcoming.indices) return
         isRemoving = true
+        val removed = upcoming[index]
+        val newList = upcoming.toMutableList().apply { removeAt(index) }
+        swipeOffsetMap.remove(removed.uri.toString())
+        onListChanged(newList)
 
-        val removedItem = list[index]
-        val isRemovedCurrentlyPlaying = removedItem.uri == currentPlaying?.uri
-
-        list.removeAt(index)
-        onListChanged(list.toList())
-
-        swipeOffsetX.clear()
-        swipeOffsetX.addAll(List(list.size) { 0f })
-
-        if (isRemovedCurrentlyPlaying) {
-            val newIndex = index.coerceAtMost(list.lastIndex)
-            val nextAudio = list.getOrNull(newIndex) ?: list.getOrNull(newIndex - 1)
-
-            if (nextAudio != null) {
-                musicPlayerVM.setAudio(nextAudio, forcePlay = true)
-            } else {
-                musicPlayerVM.stopAudio()
-            }
+        if (removed.uri == currentPlaying?.uri) {
+            val newIndex = index.coerceAtMost(newList.lastIndex)
+            val next = newList.getOrNull(newIndex) ?: newList.getOrNull(newIndex - 1)
+            if (next != null) musicPlayerVM.setAudio(next, forcePlay = true) else musicPlayerVM.stopAudio()
         }
 
+        if (draggingItemUri == removed.uri) {
+            draggingItemUri = null
+            dragOffsetY = 0f
+        }
         isRemoving = false
     }
 
@@ -598,6 +590,7 @@ fun NextSongsPopup(
         val fontSizePx = parentHeightPx * fontSizeFraction
         val fontSizeSp = with(density) { fontSizePx.toSp() }
         val itemHeightDp = with(density) { itemHeightPx.toDp() }
+
         Column(
             Modifier
                 .background(Color(0xFF303030))
@@ -614,68 +607,48 @@ fun NextSongsPopup(
             Spacer(Modifier.height(8.dp))
 
             LazyColumn(state = listState) {
-                itemsIndexed(list, key = { _, audio -> audio.uri }) { index, audio ->
-                    val isDragging = draggingIndex == index
+                itemsIndexed(upcoming, key = { _, audio -> audio.uri.toString() }) { index, audio ->
+                    val key = audio.uri.toString()
+                    val currentOffset = swipeOffsetMap[key] ?: 0f
+                    val isDragging = draggingItemUri == audio.uri
                     val offsetY = if (isDragging) dragOffsetY.roundToInt() else 0
-                    val swipeThreshold = with(density) { 50.dp.toPx() }
+                    val swipeThreshold = with(density) { 100.dp.toPx() }
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(itemHeightDp)
-                            .offset { IntOffset(swipeOffsetX.getOrNull(index)?.roundToInt() ?: 0, offsetY) }
+                            .offset { IntOffset(currentOffset.roundToInt(), offsetY) }
                             .background(if (isDragging) Color.DarkGray else Color.Transparent)
-                            .pointerInput(index) {
+                            .pointerInput(key) {
                                 detectDragGestures(
-                                    onDragStart = {
-                                        draggingIndex = index
-                                        dragOffsetY = 0f
-                                        gestureDirection = null
-                                    },
+                                    onDragStart = { draggingItemUri = audio.uri },
                                     onDrag = { change, dragAmount ->
-                                        if (gestureDirection == null) {
-                                            gestureDirection = if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y)) {
-                                                Direction.Horizontal
-                                            } else {
-                                                Direction.Vertical
-                                            }
-                                        }
-
-                                        if (gestureDirection == Direction.Horizontal) {
-                                            val newOffset = (swipeOffsetX.getOrNull(index) ?: 0f) + dragAmount.x
-                                            swipeOffsetX[index] = newOffset.coerceAtLeast(0f)
-                                        } else if (gestureDirection == Direction.Vertical) {
-                                            dragOffsetY += dragAmount.y
-                                            val newPosition = draggingIndex + (dragOffsetY / itemHeightPx).roundToInt()
-                                            if (newPosition in list.indices && newPosition != draggingIndex) {
-                                                swapItems(draggingIndex, newPosition)
-                                            }
-                                        }
-
                                         change.consume()
+                                        if (abs(dragAmount.x) > abs(dragAmount.y)) {
+                                            swipeOffsetMap[key] = (swipeOffsetMap[key] ?: 0f) + dragAmount.x
+                                        } else {
+                                            scope.launch { listState.scrollBy(-dragAmount.y) }
+                                        }
                                     },
                                     onDragEnd = {
-                                        if (gestureDirection == Direction.Horizontal) {
-                                            if ((swipeOffsetX.getOrNull(index) ?: 0f) > swipeThreshold) {
-                                                removeItem(index)
-                                            } else {
-                                                swipeOffsetX[index] = 0f
-                                            }
+                                        if ((swipeOffsetMap[key] ?: 0f) > swipeThreshold) {
+                                            removeItemByIndex(index)
+                                        } else {
+                                            swipeOffsetMap[key] = 0f
                                         }
-                                        draggingIndex = -1
+                                        draggingItemUri = null
                                         dragOffsetY = 0f
-                                        gestureDirection = null
                                     },
                                     onDragCancel = {
-                                        swipeOffsetX[index] = 0f
-                                        draggingIndex = -1
+                                        swipeOffsetMap[key] = 0f
+                                        draggingItemUri = null
                                         dragOffsetY = 0f
-                                        gestureDirection = null
                                     }
                                 )
                             }
                     ) {
-                        val swipeWidth = swipeOffsetX.getOrNull(index) ?: 0f
+                        val swipeWidth = (swipeOffsetMap[key] ?: 0f)
                         if (swipeWidth > 0f) {
                             Box(
                                 Modifier
@@ -696,21 +669,14 @@ fun NextSongsPopup(
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .offset { IntOffset(swipeWidth.roundToInt(), offsetY) }
+                                .offset { IntOffset(swipeWidth.roundToInt(), 0) }
                                 .background(if (isDragging) Color.DarkGray else Color.Transparent)
                                 .padding(horizontal = 8.dp)
-                            .clickable {
-                            musicPlayerVM.setAudio(audio, forcePlay = true)
-                        },
+                                .clickable { musicPlayerVM.setAudio(audio, forcePlay = true) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val bitmap = remember(audio.uri) {
-                                getAlbumArt(context, audio.uri)
-                            }
-                            AlbumArtImage(
-                                bitmap = bitmap,
-                                modifier = Modifier.size(itemHeightDp * 0.9f)
-                            )
+                            val bitmap = remember(audio.uri) { getAlbumArt(context, audio.uri) }
+                            AlbumArtImage(bitmap = bitmap, modifier = Modifier.size(itemHeightDp * 0.9f))
 
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -721,28 +687,54 @@ fun NextSongsPopup(
                                 overflow = TextOverflow.Ellipsis,
                                 fontSize = fontSizeSp
                             )
-                            Icon(
-                                imageVector = Icons.Default.DragHandle,
-                                contentDescription = "Sürükle",
-                                tint = Color.White,
-                                modifier = Modifier.size(fontSizePx.dp)
-                            )
-                        }
 
+                            Box(
+                                modifier = Modifier.pointerInput(key) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = { draggingItemUri = audio.uri; dragOffsetY = 0f },
+                                        onDrag = { change, dragAmount ->
+                                            if (draggingItemUri == audio.uri) {
+                                                dragOffsetY += dragAmount.y
+                                                change.consume()
+                                                val fromIndex = upcoming.indexOfFirst { it.uri == audio.uri }
+                                                val offsetIndex = (dragOffsetY / itemHeightPx).toInt()
+                                                val toIndex = (fromIndex + offsetIndex).coerceIn(0, upcoming.lastIndex)
+                                                if (fromIndex != toIndex) {
+                                                    moveItem(fromIndex, toIndex)
+                                                    dragOffsetY -= offsetIndex * itemHeightPx
+                                                    scope.launch {
+                                                        if (toIndex == 0) listState.scrollToItem(0)
+                                                        else if (toIndex == upcoming.lastIndex) listState.scrollToItem(upcoming.lastIndex)
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onDragEnd = { draggingItemUri = null; dragOffsetY = 0f },
+                                        onDragCancel = { draggingItemUri = null; dragOffsetY = 0f }
+                                    )
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DragHandle,
+                                    contentDescription = "Sürükle",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(fontSizePx.dp)
+                                )
+                            }
+                        }
                     }
 
-                    if (index < list.lastIndex) {
-                        Divider(
-                            color = Color.Gray.copy(alpha = 0.3f),
-                            thickness = 1.dp
-                        )
+                    if (index < upcoming.lastIndex) {
+                        Divider(color = Color.Gray.copy(alpha = 0.3f), thickness = 1.dp)
                     }
                 }
             }
-
         }
     }
 }
+
+
+
 
 
 @Composable
@@ -812,6 +804,7 @@ fun AddPlaylistDialog(
 
 @Composable
 fun AudioFileItem(
+    modifier: Modifier = Modifier,
     audioFile: AudioFile,
     audioList: List<AudioFile>,
     playlists: List<MusicPlayerViewModel.Playlist>,
@@ -821,8 +814,7 @@ fun AudioFileItem(
     onDelete: (AudioFile) -> Unit,
     onSelectAudio: (selectedAudio: AudioFile, fullList: List<AudioFile>) -> Unit,
     onToggleFavorite: (AudioFile) -> Unit,
-    scaleFactor: Float = 1f,
-    modifier: Modifier = Modifier
+    scaleFactor: Float = 1f
 ) {
     val context = LocalContext.current
     val bitmap = remember(audioFile.uri) { getAlbumArt(context, audioFile.uri) }
@@ -997,8 +989,3 @@ fun AudioFileItem(
         )
     }
 }
-
-
-
-
-

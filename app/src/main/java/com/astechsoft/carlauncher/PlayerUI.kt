@@ -15,7 +15,10 @@ fun PlayerUI(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onOpenSongPicker: (() -> Unit)? = null,
-) {
+    onOpenSettings: () -> Unit,
+    onShuffleNextSongs: () -> Unit,
+
+    ) {
     if (isCompact) {
         CompactBottomBar(
             isPlaying = isPlaying,
@@ -41,6 +44,8 @@ fun PlayerUI(
             onNext = onNext,
             onPrevious = onPrevious,
             onSeekTo = onSeekTo,
+            onOpenSettings = onOpenSettings,
+            onShuffleNextSongs = onShuffleNextSongs
         )
     }
 }

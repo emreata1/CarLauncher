@@ -8,7 +8,7 @@ import android.location.Geocoder
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.astechsoft.carlauncher.utils.fetchWeather
+
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,8 +26,6 @@ class TopBarViewModel(app: Application) : AndroidViewModel(app) {
     private val _locationName = MutableStateFlow("Konum Yükleniyor...")
     val locationName: StateFlow<String> = _locationName
 
-    private val _weatherInfo = MutableStateFlow("Hava durumu yükleniyor...")
-    val weatherInfo: StateFlow<String> = _weatherInfo
 
     fun fetchLocationAndWeather() {
         viewModelScope.launch {
@@ -49,21 +47,17 @@ class TopBarViewModel(app: Application) : AndroidViewModel(app) {
                         val district = address?.subAdminArea ?: "Bilinmeyen İlçe"
                         _locationName.value = "$district / $city"
 
-                        _weatherInfo.value = fetchWeather(location.latitude, location.longitude)
+
                     } else {
                         _locationName.value = "Konum Alınamadı"
-                        _weatherInfo.value = "-"
                     }
                 } catch (_: SecurityException) {
                     _locationName.value = "Konum izni yok"
-                    _weatherInfo.value = "-"
                 } catch (_: Exception) {
                     _locationName.value = "Konum Hatası"
-                    _weatherInfo.value = "-"
                 }
             } else {
                 _locationName.value = "Konum izni verilmedi"
-                _weatherInfo.value = "-"
             }
         }
     }

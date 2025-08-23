@@ -23,6 +23,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import com.astechsoft.carlauncher.viewmodels.SpeedViewModel
 
+val DarkRed = Color(0xFF8B0000)
 @SuppressLint("MissingPermission")
 @Composable
 fun SpeedometerScreen(
@@ -52,6 +53,16 @@ fun StyledSpeedometer(
     val sizeDp = (screenWidthDp * widthFraction).dp
     val radiusPx = with(LocalDensity.current) { sizeDp.toPx() / 2f }
     val pointerAnimAngle = remember { Animatable(0f) }
+    val labelPaint = remember(radiusPx) {
+        android.graphics.Paint().apply {
+            color = Color(0xFFAAAAAA).toArgb()
+            textAlign = android.graphics.Paint.Align.CENTER
+            textSize = radiusPx / 8
+            isAntiAlias = true
+            style = android.graphics.Paint.Style.FILL
+        }
+    }
+
     LaunchedEffect(Unit) {
         delay(1000)
         pointerAnimAngle.animateTo(200f, tween(1000))
@@ -111,14 +122,6 @@ fun StyledSpeedometer(
                 drawLine(color, Offset(x1, y1), Offset(x2, y2), stroke)
 
                 if (isBigTick) {
-                    val paint = android.graphics.Paint().apply {
-                        this.color = Color(0xFFAAAAAA).toArgb()
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        textSize = radiusPx / 8
-                        isAntiAlias = true
-                        style = android.graphics.Paint.Style.FILL
-                    }
-
                     val labelRadius = radiusPx * 0.78f
                     val labelX = cx + labelRadius * cos(angleRad).toFloat()
                     val labelY = cy + labelRadius * sin(angleRad).toFloat()
@@ -126,10 +129,11 @@ fun StyledSpeedometer(
                     drawContext.canvas.nativeCanvas.drawText(
                         speedValue.toString(),
                         labelX,
-                        labelY + paint.textSize / 3,
-                        paint
+                        labelY + labelPaint.textSize / 3,
+                        labelPaint
                     )
                 }
+
             }
 
             val safeSpeed = currentSpeed.coerceIn(0, maxSpeed)
@@ -138,7 +142,7 @@ fun StyledSpeedometer(
             val pointerAngleRad = Math.toRadians(pointerAngleDeg.toDouble())
             val pointerLength = radiusPx * 0.75f
             val pointerWidth = radiusPx * 0.03f
-
+            val DarkRed = Color(0xFF8B0000) // koyu kırmızı (dark red)
             val perp = pointerAngleRad + PI / 2
             val x1 = cx + cos(perp).toFloat() * pointerWidth
             val y1 = cy + sin(perp).toFloat() * pointerWidth
@@ -153,7 +157,11 @@ fun StyledSpeedometer(
                 lineTo(x3, y3)
                 close()
             }
-            drawPath(path, Color.Red)
+            drawPath(
+                path,
+                brush = Brush.linearGradient(listOf(Color.Red, Color(0xFF8B0000)))
+            )
+
 
             drawCircle(
                 color = Color.Black,

@@ -95,7 +95,6 @@ private fun PermissionCard(
                 .height(400.dp)
                 .padding(top = 30.dp, bottom = 20.dp )
         ) {
-            // Üstte izin simgesi
             Icon(
                 imageVector = when(title) {
                     "Konum" -> Icons.Default.Place // Konum için örnek ikon

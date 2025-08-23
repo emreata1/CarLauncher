@@ -1,6 +1,8 @@
 package com.astechsoft.carlauncher
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +27,7 @@ import com.astechsoft.carlauncher.utils.SongPickerPopup
 import com.astechsoft.carlauncher.utils.getAllLaunchableApps
 import kotlin.math.sqrt
 import androidx.compose.runtime.Composable
+import coil.compose.rememberAsyncImagePainter
 import com.astechsoft.carlauncher.utils.AnimatedCurvedLines
 import com.astechsoft.carlauncher.viewmodels.MusicPlayerViewModel
 import com.astechsoft.carlauncher.viewmodels.SpeedViewModel
@@ -35,7 +38,9 @@ import kotlinx.coroutines.withContext
 @Composable
 fun MusicLauncherScreen(
     drawerOpen: Boolean,
+    settingsOpen: Boolean,
     onToggleDrawer: () -> Unit,
+    onOpenSettings: () -> Unit,
     onCloseDrawer: () -> Unit,
     speedVm: SpeedViewModel = viewModel(),
     musicPlayerVM: MusicPlayerViewModel = viewModel()
@@ -55,7 +60,13 @@ fun MusicLauncherScreen(
     var showSongPicker by remember { mutableStateOf(false) }
     val currentPlaying by musicPlayerVM.selectedAudio.collectAsState()
     val upcomingSongs = musicPlayerVM.upcomingSongs
-
+    val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    var selectedCarView by remember {
+        mutableStateOf(prefs.getString("car_view_uri", null)?.let { Uri.parse(it) })
+    }
+    val painter = selectedCarView?.let { uri ->
+        rememberAsyncImagePainter(uri)
+    } ?: painterResource(id = R.drawable.carview) // default drawable
     LaunchedEffect(Unit) {
         audioFiles = getAllAudioFiles(context)
         musicPlayerVM.setAudioFiles(audioFiles)
@@ -72,11 +83,11 @@ fun MusicLauncherScreen(
             .background(Color.Black)
     ) {
         Image(
-            painter = painterResource(id = R.drawable.carview),
+            painter = painter,
             contentDescription = null,
             contentScale = ContentScale.Fit,
             modifier = Modifier
-                .width(screenWidth * 0.20f)   // Genişliği ekran genişliğinin %30'u yap
+                .width(screenWidth * 0.16f)
                 .align(Alignment.Center)
         )
 
@@ -102,7 +113,9 @@ fun MusicLauncherScreen(
                     onSeekTo = { musicPlayerVM.seekTo(it) },
                     onDrawerToggle = onToggleDrawer,
                     onNext = { musicPlayerVM.playNext() },
-                    onPrevious = { musicPlayerVM.playPrevious() }
+                    onPrevious = { musicPlayerVM.playPrevious() },
+                    onOpenSettings = onOpenSettings,
+                    onShuffleNextSongs = { musicPlayerVM.shuffleUpcomingSongs(currentPlaying) },
                 )
             }
         }
@@ -173,6 +186,16 @@ fun MusicLauncherScreen(
                 }
             }
         }
+        if (settingsOpen) {
+            SettingsScreen(
+                onClose = { onCloseDrawer() },
+                onCarViewChange = { newUri ->
+                    selectedCarView = newUri
+                    prefs.edit().putString("car_view_uri", newUri.toString()).apply()
+                }
+            )
+        }
+
 
         if (drawerOpen) {
             CustomDrawer(

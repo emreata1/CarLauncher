@@ -3,8 +3,10 @@ package com.astechsoft.carlauncher
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +34,7 @@ import kotlin.Unit
 import android.media.AudioManager
 import androidx.compose.material3.Slider
 import android.database.ContentObserver
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.max
+import com.astechsoft.carlauncher.utils.isLocationEnabled
 import com.astechsoft.carlauncher.viewmodels.TopBarViewModel
 
 const val API_KEY = "ecd4bcb60b878b71d15d823d98fd955b" // OpenWeatherMap API anahtarın
@@ -54,12 +58,25 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
     val permissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
     val locationName by vm.locationName.collectAsState()
-    val weatherInfo by vm.weatherInfo.collectAsState()
     var currentTime by remember { mutableStateOf(getCurrentTime()) }
     var isWifiConnected by remember { mutableStateOf(checkWifiConnected(context)) }
     var isBluetoothOn by remember { mutableStateOf(isBluetoothEnabled()) }
     var isBluetoothConnected by remember { mutableStateOf(false) }
+    var isLocationEnabled by remember { mutableStateOf(isLocationEnabled(context))}
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action == LocationManager.PROVIDERS_CHANGED_ACTION) {
+                    isLocationEnabled = isLocationEnabled(context)
+                }
+            }
+        }
+        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+        context.registerReceiver(receiver, filter)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
 
+// Permission kontrol ve location+weather fetch
     LaunchedEffect(permissionState.status) {
         if (permissionState.status == PermissionStatus.Granted) {
             vm.fetchLocationAndWeather()
@@ -68,8 +85,9 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
         }
     }
 
+// Diğer sürekli güncellemeler
     LaunchedEffect(Unit) {
-        while(true) {
+        while (true) {
             currentTime = getCurrentTime()
             isWifiConnected = checkWifiConnected(context)
             isBluetoothOn = isBluetoothEnabled()
@@ -119,7 +137,7 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
                                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                     })
                                 },
-                                modifier = Modifier.size(32.dp)  // Varsayılan 48dp yerine 32dp
+                                modifier = Modifier.width(56.dp).height(38.dp)
                             ) {
                                 Icon(
                                     imageVector = if (isWifiConnected) Icons.Filled.Wifi else Icons.Filled.WifiOff,
@@ -142,7 +160,7 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
                                 context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                 })
-                            },modifier = Modifier.size(32.dp)
+                            }, modifier = Modifier.width(56.dp).height(38.dp)
                             ) {
                                 Icon(
                                     imageVector = when {
@@ -162,6 +180,38 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                        Spacer(Modifier.width(16.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconButton(
+                                onClick = {
+                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    })
+                                },
+                                modifier = Modifier
+                                    .width(56.dp)
+                                    .height(38.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isLocationEnabled
+                                        ) {
+                                        Icons.Filled.LocationOn
+                                    } else {
+                                        Icons.Filled.LocationOff
+                                    },
+                                    contentDescription = "Konum Durumu",
+                                    tint = Color.White
+                                )
+                            }
+                            Text(
+                                text = if (isLocationEnabled) "Konum Açık" else "Konum Kapalı",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
 
 
 
@@ -181,14 +231,7 @@ fun CustomTopBar(drawerOpen: Boolean, onCloseDrawer: () -> Unit, vm: TopBarViewM
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text(
-                            text = weatherInfo,
-                            color = Color.LightGray,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+
                     }
                 }
 
@@ -254,9 +297,9 @@ fun VolumeSlider(
             Box(
                 modifier = Modifier
                     .size(thumbSize)
-                    .clip(CircleShape) // Önce tamamen yuvarlak yap
-                    .background(Color.Red) // Arka plan rengi
-                    .border(width = 2.dp, color = Color.White, shape = CircleShape), // Çerçeve
+                    .clip(CircleShape)
+                    .background(Color.Red)
+                    .border(width = 2.dp, color = Color.White, shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -273,8 +316,8 @@ fun VolumeSlider(
                 sliderState = sliderState,
                 modifier = Modifier.height(trackHeight),
                 colors = SliderDefaults.colors(
-                    activeTrackColor = Color.Black, // aktif kısım
-                    inactiveTrackColor = Color.Gray // pasif kısım
+                    activeTrackColor = Color.Black,
+                    inactiveTrackColor = Color.Gray
                 )
             )
         }
