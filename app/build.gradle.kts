@@ -9,21 +9,21 @@ plugins {
 }
 
 android {
-    namespace = "com.astechsoft.carlauncher"
+    namespace = "com.emreata.carlauncher"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.astechsoft.carlauncher"
+        applicationId = "emreata.carlauncher"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {
         getByName("main") {
-            assets.srcDirs("src/main/java/com/astechsoft/carlauncher/assets")
+            assets.srcDirs("src/main/java/com/emreata/carlauncher/assets")
         }
     }
 

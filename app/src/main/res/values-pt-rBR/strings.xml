@@ -1,0 +1,40 @@
+<resources>
+    <string name="wifi_status_none">Sem Wi-Fi</string>
+    <string name="bluetooth_status_none">Sem Bluetooth</string>
+    <string name="location_on">Localização ativada</string>
+    <string name="location_off">Localização desativada</string>
+    <string name="volume">Volume</string>
+    <string name="settings_title">Configurações</string>
+    <string name="car_image_hint">Use uma imagem em proporção 1:1 (Recomendado: 1024x1024)</string>
+    <string name="change">Alterar</string>
+    <string name="auto_play">Reprodução automática ao abrir</string>
+    <string name="language">Selecionar idioma</string>
+    <string name="turkish">Turco</string>
+    <string name="english">Inglês</string>
+    <string name="selected_car">Carro selecionado</string>
+    <string name="welcome">Bem-vindo</string>
+    <string name="all_songs">Todas as Músicas</string>
+    <string name="playlist_songs_count">Playlist: %1$d músicas</string>
+    <string name="delete_playlist">Excluir Playlist</string>
+    <string name="rename_playlist">Renomear Playlist</string>
+    <string name="change_image">Alterar Imagem</string>
+    <string name="no_songs_in_playlist">Esta playlist não possui músicas.</string>
+    <string name="create_new_playlist">Criar Nova Playlist</string>
+    <string name="playlist_name">Nome da Playlist</string>
+    <string name="add">Adicionar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="save">Salvar</string>
+    <string name="back">Voltar</string>
+    <string name="unknown_artist">Artista Desconhecido</string>
+    <string name="remove_from_favorites">Remover dos Favoritos</string>
+    <string name="add_to_favorites">Adicionar aos Favoritos</string>
+    <string name="song_menu">Menu da Música</string>
+    <string name="add_to_queue">Adicionar à Fila</string>
+    <string name="add_to_playlist">Adicionar à Playlist</string>
+    <string name="rename_song">Renomear Música</string>
+    <string name="delete_song">Excluir do Dispositivo</string>
+    <string name="next_songs">Próximas Músicas</string>
+    <string name="delete">Excluir</string>
+    <string name="favorites">Favoritos</string>
+
+</resources>
