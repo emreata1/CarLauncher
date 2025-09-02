@@ -16,7 +16,7 @@ android {
         applicationId = "emreata.carlauncher"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
+        versionCode = 5
         versionName = "2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

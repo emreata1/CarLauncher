@@ -37,4 +37,7 @@
     <string name="delete">Delete</string>
     <string name="favorites">Favorites</string>
     <string name="change_language">Change Language</string>
+    <string name="unknown_track">Unknown Track</string>
+    <string name="unknown_album">Unknown Album</string>
+    <string name="no_audio_files">No audio files available</string>
 </resources>

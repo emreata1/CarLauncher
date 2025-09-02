@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
             Column(modifier = Modifier.fillMaxSize()) {
                 CustomTopBar(drawerOpen = drawerOpen, onCloseDrawer = { drawerOpen = false })
 
-                if (!hasLocationPermission || !hasStoragePermission || !hasNearbyPermission ) {
+                if (!hasStoragePermission) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

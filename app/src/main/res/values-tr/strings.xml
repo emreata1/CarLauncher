@@ -36,4 +36,7 @@
     <string name="next_songs">Sıradaki Şarkılar</string>
     <string name="delete">Sil</string>
     <string name="favorites">Favoriler</string>
+    <string name="unknown_track">Bilinmeyen Parça</string>
+    <string name="unknown_album">Bilinmeyen Albüm</string>
+    <string name="no_audio_files">Hiç şarkı yok</string>
 </resources>

@@ -4,7 +4,7 @@ import com.emreata.carlauncher.viewmodels.MusicPlayerViewModel
 
 @Composable
 fun PlayerUI(
-    audio: MusicPlayerViewModel.AudioFile,
+    audio: MusicPlayerViewModel.AudioFile?,
     isCompact: Boolean,
     isPlaying: Boolean,
     currentPosition: Long,
@@ -22,8 +22,8 @@ fun PlayerUI(
     if (isCompact) {
         CompactBottomBar(
             isPlaying = isPlaying,
-            trackName = audio.title,
-            artistName = audio.artist,
+            trackName = audio?.title ?: "Bilinmeyen Şarkı",
+            artistName = audio?.artist ?: "Bilinmeyen Sanatçı",
             onPlayPauseToggle = onPlayPauseToggle,
             onNext = onNext,
             onPrevious = onPrevious,
@@ -36,8 +36,8 @@ fun PlayerUI(
             onDrawerToggle = onDrawerToggle,
             onOpenSongPicker = onOpenSongPicker ?: {},
             isPlaying = isPlaying,
-            trackName = audio.title,
-            artistName = audio.artist,
+            trackName = audio?.title ?: "Bilinmeyen Şarkı",
+            artistName = audio?.artist ?: "Bilinmeyen Sanatçı",
             currentPosition = currentPosition,
             totalDuration = totalDuration,
             onPlayPauseToggle = onPlayPauseToggle,

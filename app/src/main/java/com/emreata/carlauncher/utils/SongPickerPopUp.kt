@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,17 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import com.emreata.carlauncher.viewmodels.MusicPlayerViewModel.AudioFile
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.runtime.*
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -58,7 +48,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
@@ -69,29 +58,19 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import coil.compose.rememberAsyncImagePainter
-import com.emreata.carlauncher.CompactBottomBar
 import com.emreata.carlauncher.R
 import com.emreata.carlauncher.viewmodels.MusicPlayerViewModel
-import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
-import kotlin.math.abs
 
 @Composable
 fun SongPickerPopup(
     audioFiles: List<AudioFile>,
-    audioList: List<AudioFile>, // Tüm listeyi parametre olarak alıyoruz
     playlists: SnapshotStateList<MusicPlayerViewModel.Playlist>,
     onAddPlaylist: (String) -> Unit,
     onSelectAudio: (AudioFile, List<AudioFile>) -> Unit,
-
     onDismiss: () -> Unit,
     onChangePlaylistImage: (MusicPlayerViewModel.Playlist, Uri) -> Unit,
     onAddToQueue: (AudioFile) -> Unit,
@@ -102,42 +81,32 @@ fun SongPickerPopup(
     onPlayPlaylist: (MusicPlayerViewModel.Playlist) -> Unit,
     onDeletePlaylist: (MusicPlayerViewModel.Playlist) -> Unit,
     onRenamePlaylist: (MusicPlayerViewModel.Playlist, String) -> Unit,
-
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    audioList: List<AudioFile>
 ) {
-    val allSongsName = stringResource(R.string.all_songs) // Compose içinde çağrılır
-
+    val allSongsName = stringResource(R.string.all_songs)
     val allPlaylist = remember(audioFiles) {
-        MusicPlayerViewModel.Playlist(
-            name = allSongsName,
-            songs = audioFiles
-        )
+        MusicPlayerViewModel.Playlist(name = allSongsName, songs = audioFiles)
     }
-
-    val playlistList by remember {
-        derivedStateOf { listOf(allPlaylist) + playlists }
+    val playlistList = remember(audioFiles, playlists) {
+        listOf(allPlaylist) + playlists
     }
 
     val configuration = LocalConfiguration.current
-    val screenHeightDp = configuration.screenHeightDp
-    val baseHeightDp = 800f
-    val scaleFactor = (screenHeightDp / baseHeightDp) * 1.5f
-    var showRenameDialogForPlaylist by remember { mutableStateOf(false) }
-    var playlistToRename by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
+    val scaleFactor = (configuration.screenHeightDp / 800f) * 1.5f
+
     var selectedPlaylist by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
+    var menuExpandedForPlaylist by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var playlistToRename by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
     var newPlaylistName by remember { mutableStateOf("") }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            selectedPlaylist?.let { playlist ->
-                onChangePlaylistImage(playlist, uri)
-            }
-        }
+        uri?.let { selectedPlaylist?.let { pl -> onChangePlaylistImage(pl, uri) } }
     }
-    var menuExpandedForPlaylist by remember { mutableStateOf<MusicPlayerViewModel.Playlist?>(null) }
 
     Box(
         Modifier
@@ -145,9 +114,7 @@ fun SongPickerPopup(
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
-            ) {
-                onDismiss()
-            }
+            ) { onDismiss() }
     ) {
         Card(
             modifier = modifier
@@ -165,122 +132,24 @@ fun SongPickerPopup(
                     .fillMaxSize()
             ) {
                 if (selectedPlaylist == null) {
+                    // Playlist listesi
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(playlistList) { playlist ->
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedPlaylist = playlist }
-                                        .padding(
-                                            horizontal = (8 * scaleFactor).dp,
-                                            vertical = (8 * scaleFactor).dp
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (playlist.imageUri != null) {
-                                        Image(
-                                            painter = rememberAsyncImagePainter(playlist.imageUri),
-                                            contentDescription = "Playlist Image",
-                                            modifier = Modifier
-                                                .size((60 * scaleFactor).dp)
-                                                .clip(RoundedCornerShape(8.dp)),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
-                                            contentDescription = null,
-                                            tint = Color.LightGray,
-                                            modifier = Modifier.size((60 * scaleFactor).dp)
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column(
-                                        modifier = Modifier.weight(1f) // Text alanını genişletiyoruz
-                                    ) {
-                                        Text(
-                                            text = if (playlist.name == "Favoriler") {
-                                                stringResource(R.string.favorites)
-                                            } else {
-                                                playlist.name
-                                            },
-                                            fontSize = (14 * scaleFactor).sp,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = stringResource(
-                                                R.string.playlist_songs_count,
-                                                playlist.songs.size
-                                            ),
-                                            fontSize = (12 * scaleFactor).sp,
-                                            color = Color.Gray,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-
-                                    // Oynatma butonu
-                                    IconButton(
-                                        onClick = {
-                                            onPlayPlaylist(playlist)
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlayArrow,
-                                            contentDescription = "Oynat",
-                                            tint = Color.Cyan,
-                                            modifier = Modifier.size((30 * scaleFactor).dp)
-                                        )
-                                    }
-
-                                    // Menü (üç nokta) butonu
-                                    Box {
-                                        IconButton(onClick = {
-                                            // Açılır menüyü toggle yapıyoruz
-                                            if (menuExpandedForPlaylist == playlist) {
-                                                menuExpandedForPlaylist = null
-                                            } else {
-                                                menuExpandedForPlaylist = playlist
-                                            }
-                                        }) {
-                                            Icon(
-                                                imageVector = Icons.Default.MoreVert,
-                                                contentDescription = "Menü",
-                                                tint = Color.White,
-                                                modifier = Modifier.size((30 * scaleFactor).dp)
-                                            )
-                                        }
-                                        DropdownMenu(
-                                            expanded = menuExpandedForPlaylist == playlist,
-                                            onDismissRequest = { menuExpandedForPlaylist = null }
-                                        ) {
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.delete_playlist)) },
-                                                onClick = {
-                                                    menuExpandedForPlaylist = null
-                                                    onDeletePlaylist(playlist)
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.rename_playlist)) },
-                                                onClick = {
-                                                    menuExpandedForPlaylist = null
-                                                    newPlaylistName = playlist.name
-                                                    selectedPlaylist = null
-                                                    showRenameDialogForPlaylist = true
-                                                    playlistToRename = playlist
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-
+                            itemsIndexed(playlistList) { _, playlist ->
+                                PlaylistRow(
+                                    playlist = playlist,
+                                    scaleFactor = scaleFactor,
+                                    onSelect = { selectedPlaylist = playlist },
+                                    onPlay = onPlayPlaylist,
+                                    onDelete = onDeletePlaylist,
+                                    onRename = { p ->
+                                        playlistToRename = p
+                                        newPlaylistName = p.name
+                                        showRenameDialog = true
+                                    },
+                                    onMenuClick = { menuExpandedForPlaylist = it },
+                                    menuExpanded = menuExpandedForPlaylist == playlist
+                                )
                                 HorizontalDivider(
                                     modifier = Modifier.padding(horizontal = (8 * scaleFactor).dp),
                                     thickness = (1 * scaleFactor).dp,
@@ -299,88 +168,21 @@ fun SongPickerPopup(
                         }
                     }
                 } else {
-                    Column(Modifier.fillMaxSize()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.back),
-                                color = Color.Cyan,
-                                fontSize = (16 * scaleFactor).sp,
-                                modifier = Modifier
-                                    .clickable { selectedPlaylist = null }
-                                    .padding(8.dp)
-                            )
-
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            Text(
-                                text = selectedPlaylist!!.name,
-                                color = Color.White,
-                                fontSize = (18 * scaleFactor).sp,
-                                modifier = Modifier.align(Alignment.CenterVertically)
-                            )
-
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            Box {
-                                IconButton(onClick = { menuExpandedForPlaylist = selectedPlaylist }) {
-                                    Icon(
-                                        imageVector = Icons.Default.MoreVert,
-                                        contentDescription = "Menu",
-                                        tint = Color.White
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = menuExpandedForPlaylist == selectedPlaylist,
-                                    onDismissRequest = { menuExpandedForPlaylist = null }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.change_image)) },
-                                        onClick = {
-                                            menuExpandedForPlaylist = null
-                                            imagePickerLauncher.launch("image/*")
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        val songs = selectedPlaylist!!.songs
-                        if (songs.isEmpty()) {
-                            Box(
-                                Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.no_songs_in_playlist),
-                                    color = Color.LightGray,
-                                    fontSize = (14 * scaleFactor).sp
-                                )
-                            }
-                        } else {
-                            LazyColumn(modifier = Modifier.weight(1f)) {
-                                items(songs) { audio ->
-                                    AudioFileItem(
-                                        audioFile = audio,
-                                        audioList = songs,                // <<< burada sadece o playlist'in şarkı listesi
-                                        playlists = playlists,
-                                        onAddToQueue = onAddToQueue,
-                                        onAddToPlaylist = onAddToPlaylist,
-                                        onRename = onRenameSong,
-                                        onDelete = onDeleteSong,
-                                        onSelectAudio = onSelectAudio,    // aynı 2-parametreli fonksiyonu geçir
-                                        onToggleFavorite = onToggleFavorite,
-                                        modifier = Modifier
-                                            .padding(vertical = (4 * scaleFactor).dp, horizontal = (4 * scaleFactor).dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    // Playlist detay
+                    PlaylistDetailView(
+                        playlist = selectedPlaylist!!,
+                        scaleFactor = scaleFactor,
+                        playlists = playlists,
+                        onBack = { selectedPlaylist = null },
+                        onAddToQueue = onAddToQueue,
+                        onAddToPlaylist = onAddToPlaylist,
+                        onRenameSong = onRenameSong,
+                        onDeleteSong = onDeleteSong,
+                        onSelectAudio = onSelectAudio,
+                        onToggleFavorite = onToggleFavorite,
+                        onChangePlaylistImage = { imagePickerLauncher.launch("image/*") },
+                        onMenuToggle = { menuExpandedForPlaylist = selectedPlaylist }
+                    )
                 }
             }
         }
@@ -396,9 +198,9 @@ fun SongPickerPopup(
         )
     }
 
-    if (showRenameDialogForPlaylist && playlistToRename != null) {
+    if (showRenameDialog && playlistToRename != null) {
         AlertDialog(
-            onDismissRequest = { showRenameDialogForPlaylist = false },
+            onDismissRequest = { showRenameDialog = false },
             title = { Text("Oynatma Listesini Yeniden Adlandır") },
             text = {
                 TextField(
@@ -412,348 +214,203 @@ fun SongPickerPopup(
                     if (newPlaylistName.isNotBlank()) {
                         onRenamePlaylist(playlistToRename!!, newPlaylistName)
                     }
-                    showRenameDialogForPlaylist = false
+                    showRenameDialog = false
                     playlistToRename = null
-                }) {
-                    Text("Kaydet")
-                }
+                    newPlaylistName = ""
+                }) { Text("Kaydet") }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    showRenameDialogForPlaylist = false
+                    showRenameDialog = false
                     playlistToRename = null
-                }) {
-                    Text("İptal")
-                }
+                    newPlaylistName = ""
+                }) { Text("İptal") }
             }
         )
     }
 }
 
-
-
 @Composable
-fun ExpandedSongInfoPopup(
-    selectedAudio: AudioFile,
-    onDismiss: () -> Unit,
-    onOpenSongPicker: () -> Unit,
-    isPlaying: Boolean,
-    currentPosition: Long,
-    totalDuration: Long,
-    onPlayPauseToggle: () -> Unit,
-    onSeekTo: (Long) -> Unit,
-    onNext: () -> Unit,
-    onPrevious: () -> Unit,
-    onShuffleNextSongs: () -> Unit,
-    modifier: Modifier = Modifier
+fun PlaylistRow(
+    playlist: MusicPlayerViewModel.Playlist,
+    scaleFactor: Float,
+    onSelect: (MusicPlayerViewModel.Playlist) -> Unit,
+    onPlay: (MusicPlayerViewModel.Playlist) -> Unit,
+    onDelete: (MusicPlayerViewModel.Playlist) -> Unit,
+    onRename: (MusicPlayerViewModel.Playlist) -> Unit,
+    onMenuClick: (MusicPlayerViewModel.Playlist) -> Unit,
+    menuExpanded: Boolean
 ) {
-    val context = LocalContext.current
-    Box(
-        modifier
-            .fillMaxWidth(0.4f)
+    var menuExpanded by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelect(playlist) }
+            .padding(horizontal = (8 * scaleFactor).dp, vertical = (8 * scaleFactor).dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .fillMaxHeight()
-                .matchParentSize()
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { onDismiss() }
-        )
-
-        Card(
-            modifier = modifier
-                .fillMaxHeight()
-                .align(Alignment.Center)
-                .padding(bottom = 56.dp)
-                .zIndex(1f),
-            shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 12.dp,
-                pressedElevation = 16.dp,
-                focusedElevation = 14.dp,
-                hoveredElevation = 14.dp
-            )
-        ) {
-
-            Column(
+        val painter = playlist.imageUri?.let { rememberAsyncImagePainter(it) }
+        if (painter != null) {
+            Image(
+                painter = painter,
+                contentDescription = "Playlist Image",
                 modifier = Modifier
-                    .background(Color(0xFF303030))
-                    .padding(16.dp)
-                    .fillMaxHeight(), // Column'un yüksekliği ekranı kapsasın
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center // Dikeyde ortala
+                    .size((60 * scaleFactor).dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                contentDescription = null,
+                tint = Color.LightGray,
+                modifier = Modifier.size((60 * scaleFactor).dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (playlist.name == "Favoriler") stringResource(R.string.favorites) else playlist.name,
+                fontSize = (14 * scaleFactor).sp,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(R.string.playlist_songs_count, playlist.songs.size),
+                fontSize = (12 * scaleFactor).sp,
+                color = Color.Gray,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        IconButton(onClick = { onPlay(playlist) }) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Oynat",
+                tint = Color.Cyan,
+                modifier = Modifier.size((30 * scaleFactor).dp)
+            )
+        }
+
+        Box {
+            IconButton(onClick = { menuExpanded = !menuExpanded }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Menü",
+                    tint = Color.White,
+                    modifier = Modifier.size((30 * scaleFactor).dp)
+                )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
             ) {
-                Spacer(modifier = modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .weight(0.6f)
-                        .fillMaxWidth(0.7f)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Black.copy(alpha = 0.3f))
-                    ,
-                    contentAlignment = Alignment.Center
-                ) {
-                    val bitmap = remember(selectedAudio.uri) {
-                        getAlbumArt(context, selectedAudio.uri)
-                    }
-                    AlbumArtImage(
-                        bitmap = bitmap,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                Box(
-                    modifier = Modifier
-                        .weight(0.4f)
-                ) {
-                    CompactBottomBar(
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .padding(horizontal = 8.dp),
-                        isPlaying = isPlaying,
-                        trackName = selectedAudio.title,
-                        artistName = selectedAudio.artist,
-                        currentPosition = currentPosition,
-                        totalDuration = totalDuration,
-                        onPlayPauseToggle = onPlayPauseToggle,
-                        onNext = onNext,
-                        onPrevious = onPrevious,
-                        onSeekTo = onSeekTo,
-                        onOpenSongPicker = onOpenSongPicker,
-                        onShuffleNextSongs = onShuffleNextSongs
-                    )
-                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.delete_playlist)) }, onClick = { onDelete(playlist) })
+                DropdownMenuItem(text = { Text(stringResource(R.string.rename_playlist)) }, onClick = { onRename(playlist) })
             }
         }
     }
 }
 
-
-
 @Composable
-fun NextSongsPopup(
-    upcoming: List<AudioFile>,
-    currentPlaying: AudioFile?,
-    onListChanged: (List<AudioFile>) -> Unit,
-    musicPlayerVM: MusicPlayerViewModel,
-    modifier: Modifier = Modifier,
-    itemHeightFraction: Float = 0.05f,
-    fontSizeFraction: Float = 0.03f,
-    selectedAudio: AudioFile
+fun PlaylistDetailView(
+    playlist: MusicPlayerViewModel.Playlist,
+    scaleFactor: Float,
+    playlists: SnapshotStateList<MusicPlayerViewModel.Playlist>,
+    onBack: () -> Unit,
+    onAddToQueue: (AudioFile) -> Unit,
+    onAddToPlaylist: (AudioFile, MusicPlayerViewModel.Playlist) -> Unit,
+    onRenameSong: (AudioFile, String) -> Unit,
+    onDeleteSong: (AudioFile) -> Unit,
+    onSelectAudio: (AudioFile, List<AudioFile>) -> Unit,
+    onToggleFavorite: (AudioFile) -> Unit,
+    onChangePlaylistImage: () -> Unit,
+    onMenuToggle: () -> Unit
 ) {
-    val context = LocalContext.current
-
-    // 🔹 Artık kendi "list" state'ini tutmuyoruz, direkt upcoming ile çalışıyoruz
-    val swipeOffsetMap = remember { mutableStateMapOf<String, Float>() }
-    LaunchedEffect(upcoming) {
-        val keys = upcoming.map { it.uri.toString() }.toSet()
-        keys.forEach { if (it !in swipeOffsetMap) swipeOffsetMap[it] = 0f }
-        swipeOffsetMap.keys.filter { it !in keys }.forEach { swipeOffsetMap.remove(it) }
-    }
-
-    var draggingItemUri by remember { mutableStateOf<Uri?>(null) }
-    var dragOffsetY by remember { mutableStateOf(0f) }
-    var isRemoving by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val listState = rememberLazyListState()
-    var parentHeightPx by remember { mutableStateOf(0) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(currentPlaying, upcoming) {
-        val idx = upcoming.indexOfFirst { it.uri == currentPlaying?.uri }
-        if (idx != -1) listState.animateScrollToItem(idx)
-    }
-
-    fun moveItem(from: Int, to: Int) {
-        if (from == to) return
-        if (from !in upcoming.indices) return
-        val newList = upcoming.toMutableList()
-        val item = newList.removeAt(from)
-        val insertIdx = to.coerceIn(0, newList.size)
-        newList.add(insertIdx, item)
-        onListChanged(newList)
-    }
-
-    fun removeItemByIndex(index: Int) {
-        if (isRemoving) return
-        if (index !in upcoming.indices) return
-        isRemoving = true
-        val removed = upcoming[index]
-        val newList = upcoming.toMutableList().apply { removeAt(index) }
-        swipeOffsetMap.remove(removed.uri.toString())
-        onListChanged(newList)
-
-        if (removed.uri == currentPlaying?.uri) {
-            val newIndex = index.coerceAtMost(newList.lastIndex)
-            val next = newList.getOrNull(newIndex) ?: newList.getOrNull(newIndex - 1)
-            if (next != null) musicPlayerVM.setAudio(next, forcePlay = true) else musicPlayerVM.stopAudio()
-        }
-
-        if (draggingItemUri == removed.uri) {
-            draggingItemUri = null
-            dragOffsetY = 0f
-        }
-        isRemoving = false
-    }
-
-    Card(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(bottom = 56.dp)
-            .onSizeChanged { parentHeightPx = it.height },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(8.dp)
-    ) {
-        val itemHeightPx = parentHeightPx * itemHeightFraction
-        val fontSizePx = parentHeightPx * fontSizeFraction
-        val fontSizeSp = with(density) { fontSizePx.toSp() }
-        val itemHeightDp = with(density) { itemHeightPx.toDp() }
-
-        Column(
-            Modifier
-                .background(Color(0xFF303030))
-                .padding(12.dp)
-                .fillMaxHeight()
+    var menuExpanded by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
         ) {
             Text(
-                text = stringResource(R.string.next_songs),
-                color = Color.White,
-                fontSize = fontSizeSp * 1.5,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
+                text = stringResource(R.string.back),
+                color = Color.Cyan,
+                fontSize = (16 * scaleFactor).sp,
+                modifier = Modifier
+                    .clickable { onBack() }
+                    .padding(8.dp)
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = playlist.name,
+                color = Color.White,
+                fontSize = (18 * scaleFactor).sp,
+                modifier = Modifier.align(Alignment.CenterVertically)
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Box {
+                IconButton(onClick = { menuExpanded = !menuExpanded }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Menu",
+                        tint = Color.White
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                )  {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.change_image)) }, onClick = { onChangePlaylistImage() })
+                }
+            }
+        }
 
-            LazyColumn(state = listState) {
-                itemsIndexed(upcoming, key = { _, audio -> audio.uri.toString() }) { index, audio ->
-                    val key = audio.uri.toString()
-                    val currentOffset = swipeOffsetMap[key] ?: 0f
-                    val isDragging = draggingItemUri == audio.uri
-                    val offsetY = if (isDragging) dragOffsetY.roundToInt() else 0
-                    val swipeThreshold = with(density) { 100.dp.toPx() }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(itemHeightDp)
-                            .offset { IntOffset(currentOffset.roundToInt(), offsetY) }
-                            .background(if (isDragging) Color.DarkGray else Color.Transparent)
-                            .pointerInput(key) {
-                                detectDragGestures(
-                                    onDragStart = { draggingItemUri = audio.uri },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        if (abs(dragAmount.x) > abs(dragAmount.y)) {
-                                            swipeOffsetMap[key] = (swipeOffsetMap[key] ?: 0f) + dragAmount.x
-                                        } else {
-                                            scope.launch { listState.scrollBy(-dragAmount.y) }
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        if ((swipeOffsetMap[key] ?: 0f) > swipeThreshold) {
-                                            removeItemByIndex(index)
-                                        } else {
-                                            swipeOffsetMap[key] = 0f
-                                        }
-                                        draggingItemUri = null
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        swipeOffsetMap[key] = 0f
-                                        draggingItemUri = null
-                                        dragOffsetY = 0f
-                                    }
-                                )
-                            }
-                    ) {
-                        val swipeWidth = (swipeOffsetMap[key] ?: 0f)
-                        if (swipeWidth > 0f) {
-                            Box(
-                                Modifier
-                                    .fillMaxHeight()
-                                    .width(with(density) { swipeWidth.toDp() })
-                                    .background(Color.Red),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Sil",
-                                    tint = Color.White,
-                                    modifier = Modifier.padding(start = 16.dp)
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .offset { IntOffset(swipeWidth.roundToInt(), 0) }
-                                .background(if (isDragging) Color.DarkGray else Color.Transparent)
-                                .padding(horizontal = 8.dp)
-                                .clickable { musicPlayerVM.setAudio(audio, forcePlay = true) },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val bitmap = remember(audio.uri) { getAlbumArt(context, audio.uri) }
-                            AlbumArtImage(bitmap = bitmap, modifier = Modifier.size(itemHeightDp * 0.9f))
-
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = audio.title,
-                                color = if (audio.uri == currentPlaying?.uri) Color.Cyan else Color.LightGray,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontSize = fontSizeSp
-                            )
-
-                            Box(
-                                modifier = Modifier.pointerInput(key) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = { draggingItemUri = audio.uri; dragOffsetY = 0f },
-                                        onDrag = { change, dragAmount ->
-                                            if (draggingItemUri == audio.uri) {
-                                                dragOffsetY += dragAmount.y
-                                                change.consume()
-                                                val fromIndex = upcoming.indexOfFirst { it.uri == audio.uri }
-                                                val offsetIndex = (dragOffsetY / itemHeightPx).toInt()
-                                                val toIndex = (fromIndex + offsetIndex).coerceIn(0, upcoming.lastIndex)
-                                                if (fromIndex != toIndex) {
-                                                    moveItem(fromIndex, toIndex)
-                                                    dragOffsetY -= offsetIndex * itemHeightPx
-                                                    scope.launch {
-                                                        if (toIndex == 0) listState.scrollToItem(0)
-                                                        else if (toIndex == upcoming.lastIndex) listState.scrollToItem(upcoming.lastIndex)
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        onDragEnd = { draggingItemUri = null; dragOffsetY = 0f },
-                                        onDragCancel = { draggingItemUri = null; dragOffsetY = 0f }
-                                    )
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DragHandle,
-                                    contentDescription = "Sürükle",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(fontSizePx.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (index < upcoming.lastIndex) {
-                        HorizontalDivider(thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
-                    }
+        val songs = playlist.songs
+        if (songs.isEmpty()) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.no_songs_in_playlist),
+                    color = Color.LightGray,
+                    fontSize = (14 * scaleFactor).sp
+                )
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                itemsIndexed(songs) { _, audio ->
+                    AudioFileItem(
+                        audioFile = audio,
+                        audioList = songs,
+                        playlists = playlists,
+                        onAddToQueue = onAddToQueue,
+                        onAddToPlaylist = onAddToPlaylist,
+                        onRename = onRenameSong,
+                        onDelete = onDeleteSong,
+                        onSelectAudio = onSelectAudio,
+                        onToggleFavorite = onToggleFavorite,
+                        modifier = Modifier.padding(vertical = (4 * scaleFactor).dp, horizontal = (4 * scaleFactor).dp)
+                    )
                 }
             }
         }
     }
 }
+
+
+
+
+
+
+
 
 
 

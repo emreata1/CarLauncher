@@ -25,6 +25,7 @@ import kotlin.math.sqrt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import coil.compose.rememberAsyncImagePainter
 import com.emreata.carlauncher.utils.AnimatedCurvedLines
 import com.emreata.carlauncher.viewmodels.MusicPlayerViewModel
@@ -86,9 +87,9 @@ fun MusicLauncherScreen(
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            selectedAudio?.let {
+
                 PlayerUI(
-                    audio = it,
+                    audio = selectedAudio,
                     onOpenSongPicker = { showSongPicker = true },
                     isCompact = false,
                     isPlaying = isPlaying,
@@ -102,7 +103,7 @@ fun MusicLauncherScreen(
                     onOpenSettings = onOpenSettings,
                     onShuffleNextSongs = { musicPlayerVM.shuffleUpcomingSongs(currentPlaying) },
                 )
-            }
+
         }
 
         if (showSongPicker) {
@@ -144,7 +145,13 @@ fun MusicLauncherScreen(
                     )
 
                     ExpandedSongInfoPopup(
-                        selectedAudio = selectedAudio!!,
+                        selectedAudio = selectedAudio ?: MusicPlayerViewModel.AudioFile(
+                            title = stringResource(id = R.string.unknown_track),
+                            artist = stringResource(id = R.string.unknown_artist),
+                            uriString = "",
+                            album = stringResource(id = R.string.unknown_album),
+                            duration = 0L
+                        ),
                         onDismiss = { showSongPicker = false },
                         onOpenSongPicker = { /* opsiyonel işlem */ },
                         isPlaying = isPlaying,
@@ -166,11 +173,18 @@ fun MusicLauncherScreen(
                         musicPlayerVM = musicPlayerVM,
                         itemHeightFraction = 0.1f,
                         fontSizeFraction = 0.035f,
-                        selectedAudio = selectedAudio!!
+                        selectedAudio = selectedAudio ?: MusicPlayerViewModel.AudioFile(
+                            title = stringResource(id = R.string.unknown_track),
+                            artist = stringResource(id = R.string.unknown_artist),
+                            uriString = "",
+                            album = stringResource(id = R.string.unknown_album),
+                            duration = 0L
+                        )
                     )
                 }
             }
         }
+
         if (settingsOpen) {
             SettingsScreen(
                 onClose = { onCloseDrawer() },
