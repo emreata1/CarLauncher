@@ -33,7 +33,11 @@ It gives drivers quick access to the most important apps and information — all
 ---
 
 ## 📸 Screenshots  
-*(Add your app screenshots here)*  
+<img width="1920" height="1080" alt="unnamed" src="https://github.com/user-attachments/assets/50726861-8cd6-4b97-8f16-0ab4a35259cd" />
+
+<img width="1920" height="1080" alt="1" src="https://github.com/user-attachments/assets/8b96a495-0b34-4a91-9291-d1a665c64c34" />
+
+<img width="1920" height="1080" alt="2" src="https://github.com/user-attachments/assets/a2373312-b83f-4797-9435-49ffe9833823" />
 
 ---
 
