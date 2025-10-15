@@ -37,7 +37,7 @@ It gives drivers quick access to the most important apps and information — all
 
 <img width="1920" height="1080" alt="1" src="https://github.com/user-attachments/assets/8b96a495-0b34-4a91-9291-d1a665c64c34" />
 
-<img width="1366" height="768" alt="2" src="https://github.com/user-attachments/assets/a2373312-b83f-4797-9435-49ffe9833823" />
+<img width="1920 " height="1080" alt="2" src="https://github.com/user-attachments/assets/a2373312-b83f-4797-9435-49ffe9833823" />
 
 ---
 
